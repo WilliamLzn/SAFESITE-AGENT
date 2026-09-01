@@ -114,8 +114,7 @@ Construido sobre el dataset oficial **Construction PPE** (Ultralytics) para la t
 | Split  | Imágenes | Uso                     |
 |--------|----------|-------------------------|
 | Train  | 1,132    | Entrenamiento con etiquetas |
-| Valid  | 143      | Validación del modelo       |
-| Test   | 141      | Evaluación                  |
+| Test   | 284      | Evaluación                  |
 
 > ℹ️ **Nota sobre el repositorio:** el script `image_downloader.py` realiza su **propio split 80/20** sobre los 1,416 registros: descarga **1,129 imágenes con etiquetas** (carpeta `train/`) y **284 imágenes sin etiquetas** (carpeta `test/`), de modo que las etiquetas de test pueden generarse posteriormente para evaluación.
 
