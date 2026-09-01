@@ -78,7 +78,7 @@ El agente combina un modelo de visión por computador (**YOLO**) con reglas de d
                                      ▼
    ┌───────────────────────────────────────────────────────────────────────────┐
    │                       RAZONAMIENTO Y TOMA DE DECISIONES                   │
-   │   ▪ reglas: EPP completo / incompleto                                      │
+   │   ▪ reglas: EPP completo / incompleto                                     │
    │   ▪ memoria de corto plazo (evita notificaciones duplicadas)              │
    │   ▪ historial por zona y horario (prioriza patrones recurrentes)          │
    └───────────────────────────────────────────────────────────────────────────┘
