@@ -39,18 +39,20 @@ class SafeSiteAgent:
         incidentes = self.razonamiento.evaluar(zona, t_stamp, filtradas,
                                                origen=origen)
 
-        # 3) ACTUAR (con filtro de cooldown en la memoria)
-        for inc in incidentes:
-            if self.memoria.debe_alertar(inc, t_stamp):
-                frame_anotado = None
-                if self.guardar_frames:
-                    frame_anotado = self.percepcion.anotar(frame, filtradas)
-                for act in self.actuadores:
-                    act.alertar(inc, frame_anotado=frame_anotado)
+        # 3) ACTUAR — LOTE CONSOLIDADO: todas las faltas del frame en un
+        #    solo mensaje (cooldown por (zona, clase) como antes)
+        nuevos = [inc for inc in incidentes
+                  if self.memoria.debe_alertar(inc, t_stamp)]
+        self.alertas_bloqueadas_cooldown += len(incidentes) - len(nuevos)
+        if nuevos:
+            frame_anotado = None
+            if self.guardar_frames:
+                frame_anotado = self.percepcion.anotar(frame, filtradas)
+            for act in self.actuadores:
+                act.alertar_lote(nuevos, frame_anotado=frame_anotado)
+            for inc in nuevos:
                 self.memoria.registrar_alerta(inc, t_stamp)
                 self.alertas_emitidas += 1
-            else:
-                self.alertas_bloqueadas_cooldown += 1
 
         self.latencias_ms.append((time.perf_counter() - t0) * 1000)
         return incidentes, filtradas

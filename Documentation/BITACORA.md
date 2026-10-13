@@ -416,6 +416,36 @@ Recall A NIVEL DE INCIDENTE (¿alertó el agente la clase correcta en la escena?
 
 **Artefactos:** `eda/salidas/metricas_tuned_v2_s.json` (val/test por fotograma), `eda/salidas/resumen_fase3_demo_tuned_v2_s.json` (incidente), `runs/safesite/tuned_v2_s/` (run completo).
 
+### E25 — FASE 4 (parte 2): circuito conversacional completo (webhook bidireccional) ✅
+
+**Petición del usuario:** mensajes menos técnicos (lenguaje natural + métricas bajo demanda respondiendo INFO).
+
+**Construido:**
+- **Mensajes naturales** en `ActuadorWhatsApp` (DESCRIPCION_NATURAL por clase: "un trabajador SIN CASCO", etc.) + invitación explícita a responder INFO. Métricas TÉCNICAS solo bajo demanda.
+- **`servidor_webhook.py`** (stdlib pura, sin dependencias): GET = challenge de Meta; POST = mensajes entrantes → si el supervisor responde INFO/métricas/detalle → envía el detalle técnico de la última alerta; "hola" → presentación; otros → "solo entiendo INFO".
+- **Túnel público temporal** con cloudflared (quick tunnel, sin cuenta). **Hallazgo:** QUIC/UDP inestable en esta red (caídas cada 15-30 s: `datagram manager error`) → **`--protocol http2`** (TCP) lo estabilizó.
+
+**Camino del diagnóstico (4 hallazgos encadenados, todos documentados):**
+1. Los envíos de alerta llegaban como chat de un número desconocido (+1 555-667-8447 "Test Number") — el usuario no los veía al inicio; luego confirmó recepción.
+2. El primer INFO nunca llegó: la URL del webhook se verificaba pero faltaba la **suscripción al campo `messages`**.
+3. **`piloto.py` (modo piloto auto-suficiente):** un solo comando que limpia procesos, levanta webhook + túnel, espera propagación de DNS y se **AUTO-REGISTRA en Meta via Graph API** (`POST /{APP_ID}/subscriptions`) — ya sin pasos manuales en el panel. Errores resueltos en el camino: el token de System User NO sirve para subscriptions (error #15: exige **app access token** `APP_ID|APP_SECRET`, agregado al `.env`); el registro inmediato falla por DNS no propagado (error #2200 → espera con reintentos); el `netstat` de Windows explota en UTF-8 por BOM/codificación local (decodificación con `errors="replace"`).
+4. **La pieza final:** con el webhook registrado, los mensajes entrantes SEGUIAN sin llegar → faltaba **suscribir la app al WABA** (`POST /{WABA_ID}/subscribed_apps` → `{"success":true}`), paso que el panel hace invisible. Ese día el log registró: `📩 mensaje entrante de 573185469893: 'info' -> métricas enviadas` — **circuito conversacional completo**.
+
+**Arranque autónomo verificado (piloto):** limpieza → servidor → túnel http2 → espera DNS (7 intentos) → registro de DOS objetos (`whatsapp` con `messages` + `whatsapp_business_account` con 10 campos) → suscripción app→WABA → auto-prueba local+pública → 🟢 activo. El `.env` acumuló: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_DESTINATARIO`, `WHATSAPP_APP_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_WABA_ID` (todos gitignored).
+
+### E26 — FASE 4 (parte 3): alertas CONSOLIDADAS + rotación de escenas de prueba ✅
+
+**Petición del usuario:** (1) un solo mensaje con TODAS las faltas del frame en vez de uno por clase; (2) rotar las escenas de prueba.
+
+**Implementado:**
+- **`alertar_lote`** en los tres actuadores (base/consola/WhatsApp): el agente agrupa las faltas confirmadas del frame, anota UNA sola foto y envía UN mensaje: "Detectamos varios incumplimientos de EPP en la zona X: • Un Trabajador Sin Casco • Un Trabajador Sin Guantes…". Cooldown por (zona, clase) intacto; el historial registra cada falta individual (misma hora de confirmación).
+- **INFO por lote:** `_ultimos_incidentes` agrupa el historial por `t_confirmacion` → el detalle técnico lista todas las faltas de la última alerta con su confianza.
+- **Rotación determinista** en `prueba_whatsapp.py`: puntero persistente (`runs/agente/puntero_prueba.txt`) que cicla por las 28 escenas de incidente de val — cada corrida muestra escenas distintas (verificado: [0,1,2] → [3,4,5]; el puntero autoavanza). Nota técnica: el pre-sembrado manual del puntero falló silenciosamente por BOM de PowerShell (`Set-Content -Encoding utf8`) en la primera corrida — el puntero lo escribe Python en plano, así que funciona correctamente desde la segunda.
+
+**Prueba real (GPU, 3 escenas rotativas):** escena #3 → lote=2 (`no_gloves` 20% + `no_helmet` 19%), escena #4 → lote=2 (`no_gloves` 58% + `no_helmet` 29%), escena #5 → lote=1 (`no_helmet` 41%). **5 violaciones en 3 mensajes** (antes: 5 mensajes y 5 fotos duplicadas) — 40% menos de llamadas a la API por lote doble.
+
+**Artefactos:** `src/safesite/{actuarios,agente,servidor_webhook,prueba_whatsapp,piloto}.py` actualizados, `eda/salidas/resumen_fase4_whatsapp.json`.
+
 ### E24 — FASE 4 (parte 1) COMPLETADA: alertas REALES de WhatsApp con evidencia ✅
 
 **Configuración de credenciales (Meta Business Cloud API):**

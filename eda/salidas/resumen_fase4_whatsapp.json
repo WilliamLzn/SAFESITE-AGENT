@@ -4,10 +4,46 @@
   "device": "0",
   "split": "val",
   "escenas_procesadas": 3,
-  "escenas_con_alerta_whatsapp": 2,
+  "escenas_usadas": [
+    {
+      "indice": 3,
+      "gt": [
+        7,
+        8,
+        9
+      ],
+      "alertadas": [
+        "no_gloves",
+        "no_helmet"
+      ]
+    },
+    {
+      "indice": 4,
+      "gt": [
+        7,
+        9
+      ],
+      "alertadas": [
+        "no_gloves",
+        "no_helmet"
+      ]
+    },
+    {
+      "indice": 5,
+      "gt": [
+        7,
+        8
+      ],
+      "alertadas": [
+        "no_helmet"
+      ]
+    }
+  ],
+  "escenas_con_alerta_whatsapp": 3,
+  "nota": "alertas CONSOLIDADAS: un mensaje por escena con todas las faltas y una sola foto",
   "llamadas_http_api": 6,
-  "latencia_whatsapp_media_ms": 2637.8,
-  "latencia_whatsapp_max_ms": 4103.7,
-  "latencia_agente_media_ms": 1838.5,
-  "duracion_total_s": 20.2
+  "latencia_whatsapp_media_ms": 1905.4,
+  "latencia_whatsapp_max_ms": 2528.8,
+  "latencia_agente_media_ms": 1481.0,
+  "duracion_total_s": 14.8
 }

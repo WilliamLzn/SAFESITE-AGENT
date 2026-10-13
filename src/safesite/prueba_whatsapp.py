@@ -25,6 +25,25 @@ from .agente import SafeSiteAgent
 from .demo import BASE, FPS_SIMULADO, FRAMES_POR_ESCENA, cargar_escenas
 
 SALIDA = os.path.join(BASE, "eda", "salidas", "resumen_fase4_whatsapp.json")
+RUTA_PUNTERO = os.path.join(BASE, "runs", "agente", "puntero_prueba.txt")
+
+
+def _escenas_rotativas(incidentes, n):
+    """Rotación determinista: cada corrida usa las siguientes n escenas
+    (puntero persistente que cicla) — así las pruebas muestran variedad
+    de tipos de incumplimiento en lugar de la misma escena."""
+    os.makedirs(os.path.dirname(RUTA_PUNTERO), exist_ok=True)
+    puntero = 0
+    if os.path.exists(RUTA_PUNTERO):
+        try:
+            puntero = int(open(RUTA_PUNTERO, encoding="utf-8").read().strip())
+        except ValueError:
+            puntero = 0
+    total = len(incidentes)
+    indices = [(puntero + i) % total for i in range(n)]
+    with open(RUTA_PUNTERO, "w", encoding="utf-8") as f:
+        f.write(str((puntero + n) % total))
+    return indices, [incidentes[i] for i in indices]
 
 
 def main():
@@ -51,19 +70,23 @@ def main():
                            actuadores=[ActuadorConsola(), act_whatsapp])
     print(f"Modelo: {config.RUTA_MODELO} | device: {args.device}")
 
-    # 2) escenas de incidente del split elegido
+    # 2) escenas de incidente del split elegido (ROTATIVAS)
     incidentes, _ = cargar_escenas(args.split)
-    escenas = incidentes[:args.escenas]
-    if not escenas:
+    if not incidentes:
         raise SystemExit(f"Sin escenas de incidente en split {args.split}")
+    indices, escenas = _escenas_rotativas(incidentes, args.escenas)
+    print(f"escenas rotativas #{indices} de {len(incidentes)} disponibles "
+          f"(split {args.split})")
 
     # 3) correr el agente (4 frames/escena, igual que el demo)
     t_inicio = time.perf_counter()
     escenas_con_alerta = 0
-    for idx, (ruta_jpg, gt) in enumerate(escenas):
+    escenas_usadas = []
+    for idx_escena, (ruta_jpg, gt) in zip(indices, escenas):
         frame = cv2.imread(ruta_jpg)
-        zona = f"prueba_{args.split}_{idx:04d}"
+        zona = f"prueba_{args.split}_{idx_escena:04d}"
         alerto = False
+        clases_alertadas = []
         for k in range(FRAMES_POR_ESCENA):
             incidentes_conf, _ = agente.procesar_frame(
                 frame, zona=zona,
@@ -71,11 +94,15 @@ def main():
                 origen=os.path.basename(ruta_jpg))
             if incidentes_conf:
                 alerto = True
-                break  # una alerta por escena basta para la prueba
+                clases_alertadas = sorted(i.clase for i in incidentes_conf)
+                break  # una alerta (consolidada) por escena basta
+        escenas_usadas.append({"indice": idx_escena,
+                                "gt": sorted(gt),
+                                "alertadas": clases_alertadas})
         if alerto:
             escenas_con_alerta += 1
-        print(f"escena {idx + 1}/{len(escenas)} gt={sorted(gt)} -> "
-              f"{'ALERTA ENVIADA' if alerto else 'sin deteccion'}")
+        print(f"escena #{idx_escena} gt={sorted(gt)} -> "
+              f"{'ALERTA ENVIADA (' + ', '.join(clases_alertadas) + ')' if alerto else 'sin deteccion'}")
 
     duracion = time.perf_counter() - t_inicio
     http_llamadas = len(act_whatsapp.tiempos_envio_ms)
@@ -85,7 +112,10 @@ def main():
         "device": args.device,
         "split": args.split,
         "escenas_procesadas": len(escenas),
+        "escenas_usadas": escenas_usadas,
         "escenas_con_alerta_whatsapp": escenas_con_alerta,
+        "nota": "alertas CONSOLIDADAS: un mensaje por escena con todas "
+                "las faltas y una sola foto",
         "llamadas_http_api": http_llamadas,
         "latencia_whatsapp_media_ms": round(
             sum(act_whatsapp.tiempos_envio_ms) / http_llamadas, 1)

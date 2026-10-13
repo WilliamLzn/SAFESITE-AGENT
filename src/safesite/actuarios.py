@@ -21,6 +21,13 @@ class ActuadorBase:
     def alertar(self, incidente, frame_anotado=None, ruta_frame=None):
         raise NotImplementedError
 
+    def alertar_lote(self, incidentes, frame_anotado=None, ruta_frame=None):
+        """Alerta consolidada: TODOS los incumplimientos del frame en un
+        solo mensaje (optimiza mensajes y llamadas a la API). Por defecto
+        degrada a alertas individuales."""
+        for inc in incidentes:
+            self.alertar(inc, frame_anotado=frame_anotado, ruta_frame=ruta_frame)
+
 
 class ActuadorConsola(ActuadorBase):
     """Alerta legible en consola + persistencia del frame anotado."""
@@ -45,6 +52,22 @@ class ActuadorConsola(ActuadorBase):
             cv2.imwrite(destino, frame_anotado)
             return destino
         return ruta_frame
+
+    def alertar_lote(self, incidentes, frame_anotado=None, ruta_frame=None):
+        hora = getattr(incidentes[0], "hora", "")
+        resumen = ", ".join(f"{i.clase} ({i.conf_media:.0%})"
+                            for i in incidentes)
+        print(f"\n🚨 ALERTA [{self.nombre}] zona={incidentes[0].zona} "
+              f"lote={len(incidentes)}: {resumen} {hora}".strip())
+        destino = None
+        if frame_anotado is not None:
+            import cv2
+            nombre = (f"{incidentes[0].zona}_lote_"
+                      f"{int(incidentes[0].t_confirmacion)}.jpg").replace(":", "-")
+            destino = os.path.join(self.dir, nombre)
+            cv2.imwrite(destino, frame_anotado)
+            print(f"   evidencia: {destino}")
+        return destino
 
 
 class ActuadorWhatsApp(ActuadorBase):
@@ -102,10 +125,10 @@ class ActuadorWhatsApp(ActuadorBase):
 
     # ---------- envios ----------
 
-    def enviar_texto(self, texto):
-        """Envia un mensaje de texto libre. Devuelve el wamid."""
+    def enviar_texto(self, texto, para=None):
+        """Envia un mensaje de texto libre (a `para` o al destinatario de config)."""
         resp = self._post("messages", json={
-            "messaging_product": "whatsapp", "to": self.destinatario,
+            "messaging_product": "whatsapp", "to": para or self.destinatario,
             "type": "text", "text": {"body": texto},
         })
         resp.raise_for_status()
@@ -130,13 +153,54 @@ class ActuadorWhatsApp(ActuadorBase):
 
     # ---------- interfaz del actuador ----------
 
+    # Lenguaje natural por clase de incumplimiento (para el mensaje al supervisor)
+    DESCRIPCION_NATURAL = {
+        7: "un trabajador SIN CASCO",
+        8: "un trabajador SIN GAFAS de protección",
+        9: "un trabajador SIN GUANTES",
+        10: "un trabajador SIN BOTAS de seguridad",
+    }
+
+    @staticmethod
+    def _resumen_lote(incidentes):
+        """Frase natural con todas las faltas del frame (1 o varias)."""
+        faltas = [ActuadorWhatsApp.DESCRIPCION_NATURAL.get(
+            inc.clase_id, f"incumplimiento de EPP ({inc.clase})")
+            for inc in incidentes]
+        zona = incidentes[0].zona
+        if len(incidentes) == 1:
+            return f"Detectamos {faltas[0]} en la zona {zona}."
+        lista = "\n".join(f"• {f.title()}" for f in faltas)
+        return (f"Detectamos varios incumplimientos de EPP en la zona "
+                f"{zona}:\n{lista}")
+
     @staticmethod
     def _caption(incidente):
+        """Mensaje natural (no técnico) que acompaña la foto (alerta individual)."""
         from datetime import datetime
-        return (f"SafeSite-Agent - Zona: {incidente.zona} | "
-                f"INCUMPLIMIENTO: {incidente.clase} | "
-                f"conf {incidente.conf_media:.0%} | "
-                f"{datetime.fromtimestamp(incidente.t_confirmacion).strftime('%H:%M:%S')}")
+        descripcion = ActuadorWhatsApp.DESCRIPCION_NATURAL.get(
+            incidente.clase_id, f"un incumplimiento de EPP ({incidente.clase})")
+        hora = datetime.fromtimestamp(
+            incidente.t_confirmacion).strftime("%I:%M %p").lstrip("0")
+        return (
+            f"🚨 Alerta SafeSite — {hora}\n\n"
+            f"Detectamos {descripcion} en la zona {incidente.zona}.\n\n"
+            f"📸 Te adjuntamos la foto del momento.\n\n"
+            f"_Responde_ **INFO** _si quieres ver el detalle técnico._"
+        )
+
+    @staticmethod
+    def _caption_lote(incidentes):
+        """Mensaje natural consolidado: todas las faltas en un solo caption."""
+        from datetime import datetime
+        hora = datetime.fromtimestamp(
+            incidentes[0].t_confirmacion).strftime("%I:%M %p").lstrip("0")
+        return (
+            f"🚨 Alerta SafeSite — {hora}\n\n"
+            f"{ActuadorWhatsApp._resumen_lote(incidentes)}\n\n"
+            f"📸 Te adjuntamos la foto del momento.\n\n"
+            f"_Responde_ **INFO** _si quieres ver el detalle técnico._"
+        )
 
     def alertar(self, incidente, frame_anotado=None, ruta_frame=None):
         caption = self._caption(incidente)
@@ -171,6 +235,41 @@ class ActuadorWhatsApp(ActuadorBase):
             return wamid
         except Exception as e:
             print(f"❌ WhatsApp: fallo tambien el envio de texto: {e}")
+            return None
+
+    def alertar_lote(self, incidentes, frame_anotado=None, ruta_frame=None):
+        """Alerta CONSOLIDADA: un solo mensaje con todas las faltas del frame
+        y una sola foto (optimiza mensajes, llamadas API y latencia)."""
+        caption = self._caption_lote(incidentes)
+        if self.modo != "ENVIO-REAL":
+            print(f"📲 WhatsApp[DRY-RUN] lote ({len(incidentes)} faltas) -> "
+                  f"{caption[:120]}...")
+            return None
+
+        if frame_anotado is not None:
+            try:
+                import cv2
+                ok, buf = cv2.imencode(".jpg", frame_anotado,
+                                       [cv2.IMWRITE_JPEG_QUALITY, 85])
+                if not ok:
+                    raise RuntimeError("cv2.imencode fallo")
+                media_id = self.subir_imagen_bytes(buf.tobytes(),
+                                                   nombre="safesite_alerta.jpg")
+                wamid = self.enviar_imagen(media_id, caption)
+                print(f"📲 WhatsApp[ENVIO-REAL] lote {len(incidentes)} faltas, "
+                      f"imagen+caption enviado (wamid {wamid[:18]}...)")
+                return wamid
+            except Exception as e:
+                print(f"⚠️ WhatsApp: fallo el lote con imagen ({e}); "
+                      f"degradando a texto puro")
+
+        try:
+            wamid = self.enviar_texto(caption)
+            print(f"📲 WhatsApp[ENVIO-REAL] lote {len(incidentes)} faltas, "
+                  f"texto enviado (wamid {wamid[:18]}...)")
+            return wamid
+        except Exception as e:
+            print(f"❌ WhatsApp: fallo tambien el texto del lote: {e}")
             return None
 
     # ---------- plantilla (produccion con numero de negocio real) ----------
