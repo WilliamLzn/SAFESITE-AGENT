@@ -1,0 +1,20 @@
+# --- Entornos y artefactos pesados ---
+.venv/
+__pycache__/
+*.pyc
+
+# --- Entrenamiento (checkpoints y logs: se documentan en la bitácora, no se versionan) ---
+runs/
+weights/
+*.pt
+
+# --- dataset_v2: DERIVABLE desde safesite_dataset/ con `python eda\06_resplit_oficial.py` ---
+# (148 MB de copias; los datos crudos de safesite_dataset/ SÍ están versionados como respaldo)
+dataset_v2/
+
+# --- Caches de ultralytics ---
+*.cache
+
+# --- Sistema ---
+Thumbs.db
+.DS_Store

@@ -1,0 +1,16 @@
+{
+  "splits": {
+    "train": 1130,
+    "val": 143,
+    "test": 140
+  },
+  "total_imagenes": 1413,
+  "lineas_etiqueta": 11488,
+  "descargadas": [],
+  "fallidas": [
+    "b10122e5b7cc4e06cbb7df1c9fe3da07.jpg (split oficial test)",
+    "a7951ad25008d7f2964e80db96a8fb08.jpg (split oficial train)",
+    "a943c1f331651efd43d8edd49b79b01c.jpg (split oficial train)"
+  ],
+  "dataset_yaml": "C:\\Users\\Lenovo\\Documents\\IA\\SAFESITE-AGENT\\dataset_v2\\dataset.yaml"
+}

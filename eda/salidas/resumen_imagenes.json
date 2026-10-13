@@ -1,0 +1,84 @@
+{
+  "alcance_metadatos": "TODAS las imagenes en disco (train=1129, test=284)",
+  "alcance_pixeles": "MUESTRA determinista seed=42, n=200 (~14%) - EXPLORATORIO",
+  "imagenes_que_no_abren": 0,
+  "formato": {
+    "JPEG": 1413
+  },
+  "modo_color": {
+    "RGB": 1413
+  },
+  "mismatch_dimension_vs_ndjson": 0,
+  "dimensiones_mas_comunes": {
+    "640x640": 1114,
+    "1024x768": 41,
+    "1024x683": 39,
+    "683x1024": 26,
+    "768x1024": 25,
+    "612x408": 24,
+    "1024x1024": 12,
+    "1024x681": 9,
+    "685x1024": 5,
+    "1024x682": 5
+  },
+  "tamanos_kb": {
+    "n": 1413,
+    "min": 14.1,
+    "p25": 66.7,
+    "mediana": 91.6,
+    "p75": 132.0,
+    "max": 468.8,
+    "media": 105.037,
+    "sd": 53.006
+  },
+  "resolucion_ancho_px": {
+    "n": 1413,
+    "min": 408,
+    "p25": 640,
+    "mediana": 640,
+    "p75": 640,
+    "max": 1024,
+    "media": 688.901,
+    "sd": 124.02
+  },
+  "resolucion_alto_px": {
+    "n": 1413,
+    "min": 263,
+    "p25": 640,
+    "mediana": 640,
+    "p75": 640,
+    "max": 1024,
+    "media": 672.885,
+    "sd": 114.271
+  },
+  "relaciones_aspecto": {
+    "1.0": 1127,
+    "1.5": 79,
+    "0.67": 43,
+    "1.33": 42,
+    "0.75": 28,
+    "1.49": 9,
+    "1.51": 7,
+    "0.8": 6
+  },
+  "muestra_brillo_0_255": {
+    "n": 200,
+    "min": 13.6,
+    "p25": 102.3,
+    "mediana": 132.0,
+    "p75": 158.8,
+    "max": 203.4,
+    "media": 129.594,
+    "sd": 37.939
+  },
+  "muestra_contraste_sd_gris": {
+    "n": 200,
+    "min": 21.7,
+    "p25": 56.7,
+    "mediana": 65.9,
+    "p75": 83.0,
+    "max": 116.1,
+    "media": 69.151,
+    "sd": 18.39
+  }
+}
