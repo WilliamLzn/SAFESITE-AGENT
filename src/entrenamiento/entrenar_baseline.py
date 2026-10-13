@@ -57,6 +57,13 @@ def main():
                         help="0 por defecto: en Windows los workers re-importan "
                              "torch/CUDA DLLs y pueden agotar el commit "
                              "(WinError 1455, ver BITACORA E15)")
+    parser.add_argument("--data", default=DATASET_YAML,
+                        help="ruta al dataset.yaml (default: dataset_v2; "
+                             "Fase 2 usa dataset_v3/dataset.yaml con oversampling)")
+    parser.add_argument("--hsv-v", type=float, default=0.4,
+                        help="jitter de brillo (V) del HSV augmentation "
+                             "(default ultralytics 0.4; Fase 2 usa 0.5 por "
+                             "las imagenes oscuras del EDA F9)")
     args = parser.parse_args()
 
     run_dir = os.path.join(BASE, "runs", "safesite", args.name)
@@ -65,7 +72,8 @@ def main():
 
     model = YOLO(args.model)
     model.train(
-        data=DATASET_YAML,
+        data=args.data,
+        hsv_v=args.hsv_v,
         epochs=args.epochs,
         patience=args.patience,
         imgsz=args.imgsz,
@@ -89,7 +97,7 @@ def main():
                "config": vars(args)}
     for split in ("val", "test"):
         print(f"\n===== Evaluacion en split {split.upper()} =====")
-        metricas = mejor.val(data=DATASET_YAML, split=split, plots=False)
+        metricas = mejor.val(data=args.data, split=split, plots=False)
         resumen[split] = extraer_metricas(metricas)
         print(json.dumps(resumen[split], ensure_ascii=False, indent=2))
 

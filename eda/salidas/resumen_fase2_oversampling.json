@@ -1,0 +1,48 @@
+{
+  "politica": "imagenes con clases no_* (ids 7-10) reciben +1 copia; con no_boots (id 10) +1 copia adicional; val/test intactos",
+  "imagenes_train": {
+    "originales": 1130,
+    "rep1": 239,
+    "rep2": 28
+  },
+  "total_train_v3": 1397,
+  "cajas_por_clase_v2_train": {
+    "helmet": 1340,
+    "gloves": 1144,
+    "vest": 1268,
+    "boots": 1228,
+    "goggles": 416,
+    "none": 648,
+    "Person": 1766,
+    "no_helmet": 397,
+    "no_goggle": 337,
+    "no_gloves": 440,
+    "no_boots": 88
+  },
+  "cajas_por_clase_v3_train": {
+    "helmet": 1351,
+    "gloves": 1173,
+    "vest": 1276,
+    "boots": 1305,
+    "goggles": 451,
+    "none": 1096,
+    "Person": 2249,
+    "no_helmet": 846,
+    "no_goggle": 716,
+    "no_gloves": 936,
+    "no_boots": 264
+  },
+  "factor_por_clase": {
+    "helmet": 1.008,
+    "gloves": 1.025,
+    "vest": 1.006,
+    "boots": 1.063,
+    "goggles": 1.084,
+    "none": 1.691,
+    "Person": 1.273,
+    "no_helmet": 2.131,
+    "no_goggle": 2.125,
+    "no_gloves": 2.127,
+    "no_boots": 3.0
+  }
+}

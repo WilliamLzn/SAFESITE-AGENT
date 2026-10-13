@@ -8,9 +8,11 @@ runs/
 weights/
 *.pt
 
-# --- dataset_v2: DERIVABLE desde safesite_dataset/ con `python eda\06_resplit_oficial.py` ---
-# (148 MB de copias; los datos crudos de safesite_dataset/ SÍ están versionados como respaldo)
+# --- dataset_v2 y dataset_v3: DERIVABLES desde safesite_dataset/ ---
+# (v2: `python eda\06_resplit_oficial.py` | v3: + `python eda\07_oversampling_dataset_v3.py`)
+# Los datos crudos de safesite_dataset/ SÍ están versionados como respaldo
 dataset_v2/
+dataset_v3/
 
 # --- Caches de ultralytics ---
 *.cache
