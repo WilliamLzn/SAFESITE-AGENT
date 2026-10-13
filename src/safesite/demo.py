@@ -17,6 +17,7 @@ Diseno del experimento (metrica reencuadrada de la bitacora E21):
 Ejecutar desde la RAIZ del proyecto:
     .venv\\Scripts\\python.exe -m src.safesite.demo
 """
+import argparse
 import json
 import os
 import sys
@@ -27,10 +28,17 @@ from . import config
 from .agente import SafeSiteAgent
 
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SALIDA = os.path.join(BASE, "eda", "salidas", "resumen_fase3_demo.json")
 FRAMES_POR_ESCENA = 4
 FPS_SIMULADO = 2.0
 SEED = 42
+
+
+def _tag_del_modelo(ruta_modelo):
+    """runs/safesite/<name>/weights/best.pt -> <name>; si no, 'custom'."""
+    try:
+        return os.path.basename(os.path.dirname(os.path.dirname(ruta_modelo)))
+    except (IndexError, OSError):
+        return "custom"
 
 
 def clases_de_ruta(ruta_txt):
@@ -150,11 +158,27 @@ def evaluar_split(agente, split, verbose=True):
 
 
 def main():
-    if not os.path.exists(os.path.join(BASE, config.RUTA_MODELO)):
-        sys.exit(f"No existe el checkpoint: {config.RUTA_MODELO}. "
-                 f"Entrena primero el baseline (Fase 1).")
+    parser = argparse.ArgumentParser(
+        description="Demo del agente SafeSite sobre escenas del dataset")
+    parser.add_argument("--modelo", default=None,
+                        help="ruta al checkpoint (default: config.RUTA_MODELO)")
+    parser.add_argument("--device", default=None,
+                        help="'cpu' | '0' (GPU) (default: config.DEVICE_DEFECTO)")
+    args = parser.parse_args()
 
-    agente = SafeSiteAgent()
+    ruta_modelo = args.modelo or config.RUTA_MODELO
+    device = args.device or config.DEVICE_DEFECTO
+    if not os.path.exists(os.path.join(BASE, ruta_modelo)):
+        sys.exit(f"No existe el checkpoint: {ruta_modelo}. "
+                 f"Entrena primero (Fase 1).")
+
+    tag = _tag_del_modelo(ruta_modelo) if args.modelo else ""
+    salida = os.path.join(
+        BASE, "eda", "salidas",
+        f"resumen_fase3_demo_{tag}.json" if tag else "resumen_fase3_demo.json")
+    print(f"Modelo: {ruta_modelo} | device: {device} | salida: {salida}")
+
+    agente = SafeSiteAgent(ruta_modelo=ruta_modelo, device=device)
     por_split = {}
     for split in ("train", "val", "test"):
         antes = agente.alertas_emitidas
@@ -163,8 +187,8 @@ def main():
 
     resumen = {
         "config": {
-            "modelo": config.RUTA_MODELO,
-            "device": config.DEVICE_DEFECTO,
+            "modelo": ruta_modelo,
+            "device": device,
             "umbral_incumplimiento": config.UMBRAL_INCUMPLIMIENTO,
             "k_frames_confirmacion": config.K_FRAMES_CONFIRMACION,
             "cooldown_s": config.COOLDOWN_S,
@@ -177,10 +201,10 @@ def main():
         "por_split": por_split,
         "ejecucion": agente.resumen_ejecucion(),
     }
-    with open(SALIDA, "w", encoding="utf-8") as f:
+    with open(salida, "w", encoding="utf-8") as f:
         json.dump(resumen, f, ensure_ascii=False, indent=2)
     print(json.dumps(resumen, ensure_ascii=False, indent=2))
-    print(f"\nResumen guardado en: {SALIDA}")
+    print(f"\nResumen guardado en: {salida}")
     print(f"Historial de incidentes: {config.ARCHIVO_HISTORIAL}")
 
 

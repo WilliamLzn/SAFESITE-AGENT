@@ -10,8 +10,10 @@ Valores por defecto derivados de la evidencia:
   INCIDENTE en video continuo, no el recall por fotograma.
 """
 
-# --- Modelo (checkpoint actual; cambiar al mejor modelo futuro) ---
-RUTA_MODELO = r"runs\safesite\baseline_v1\weights\best.pt"
+# --- Modelo (checkpoint de DESPLIEGUE, elegido en P8/BITACORA E23) ---
+# tuned_v2_s (yolov8s, data v3): recall incidente no_helmet 0.963 val / 0.833 test
+# vs baseline_v1 (yolov8n, data v2): 0.778 / 0.792. Ver eda/salidas/resumen_fase3_demo*.json
+RUTA_MODELO = r"runs\safesite\tuned_v2_s\weights\best.pt"
 DEVICE_DEFECTO = "cpu"  # el demo corre en CPU para no competir con entrenamientos en GPU
 
 # --- Clases (orden = dataset.yaml) ---

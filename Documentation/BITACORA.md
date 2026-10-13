@@ -383,6 +383,39 @@ Recall A NIVEL DE INCIDENTE (¿alertó el agente la clase correcta en la escena?
 
 **Estado `tuned_v2_s` (yolov8s):** 🔄 entrenando en background (~2 h estimadas) — al terminar se comparará con baseline_v1 en la métrica de incidente (misma simulación) y se decidirá el checkpoint de despliegue.
 
+### E23 — P6 COMPLETADO + P8 DECISIÓN DE DESPLIEGUE: tuned_v2_s gana ✅
+
+**tuned_v2_s (yolov8s, 11.1M params, data v3):** 44/100 épocas (early stop, mejor época 19) en 0.808 h · VRAM 2.4 GB · seed 42 · `runs/safesite/tuned_v2_s/weights/best.pt` (22.5 MB)
+
+**Métricas estándar (por fotograma), best.pt:**
+
+| Métrica | VAL | TEST |
+|---|---:|---:|
+| mAP50 global | 0.553 | 0.523 |
+| **Precisión global** | **0.810** (la más alta de los 3 modelos) | 0.611 |
+| no_helmet AP50 | **0.453** (la más alta) | **0.176** (la más alta) |
+| helmet AP50 | 0.819 | 0.925 |
+
+**P8 — Comparación en la métrica que importa (recall A NIVEL DE INCIDENTE, agente completo, misma simulación):**
+
+| Métrica | baseline_v1 (v8n, GPU→sim) | **tuned_v2_s (v8s, GPU)** | Δ val |
+|---|---:|---:|---:|
+| no_helmet — val | 0.778 | **0.963** | **+18.5 pts** |
+| no_helmet — test | 0.792 | **0.833** | +4.1 pts |
+| Cualquier `no_*` (escena) — val | 0.929 | **0.964** | +3.5 pts |
+| Cualquier `no_*` (escena) — test | 0.846 | **0.962** | **+11.6 pts** |
+| no_gloves — val | 0.696 | **0.783** | +8.7 pts |
+| no_goggle — test | 0.417 | **0.542** | +12.5 pts |
+| no_boots — val (n=2) | 0.500 | 0.000 | ruido (n minúsculo) |
+| Falsas alarmas — val / test | 2.6% / 0.9% | 3.5% / 2.6% | +0.9 / +1.7 pts |
+| Latencia por frame (GPU) | — | **31.5 ms** | — |
+
+**DECISIÓN (P8): `tuned_v2_s/weights/best.pt` es el checkpoint de despliegue.** Superior en todas las métricas de negocio (recall de incidente), con falsas alarmas levemente mayores pero aún bajas (2.6–3.5%) y ajustables por umbral. El criterio pre-registrado (recall `no_helmet` ≥ 0.70 en val) se cumple **con holgura: 0.963**. `config.RUTA_MODELO` ya apunta a él.
+
+**Notas técnicas:** (1) la simulación P8 corrió en GPU (ya libre tras el entrenamiento) con `--device 0`; (2) el demo ahora acepta `--modelo` y `--device` y guarda `resumen_fase3_demo_<run>.json` por modelo (no sobrescribe comparaciones); (3) conclusión de Fase 2 consolidada: el modelo MÁS GRANDE sí ayudó donde la replicación de datos falló — el límite era parcialmente capacidad de extraer el patrón "ausencia de EPP", no solo datos; (4) `no_boots` en val tiene n=2 escenas — cualquier número allí es ruido (documentado en E17).
+
+**Artefactos:** `eda/salidas/metricas_tuned_v2_s.json` (val/test por fotograma), `eda/salidas/resumen_fase3_demo_tuned_v2_s.json` (incidente), `runs/safesite/tuned_v2_s/` (run completo).
+
 ---
 
 ## 📊 Tabla resumen del EDA (para evaluación rápida)
@@ -410,9 +443,9 @@ Recall A NIVEL DE INCIDENTE (¿alertó el agente la clase correcta en la escena?
 | P3 | Evaluación en val + test etiquetado; tabla de métricas por clase | integrado en el script (P2) | ✅ **E17** (criterio NO cumplido) |
 | P4 | Registro de métricas `baseline_v1` en esta bitácora | — | ✅ **E17** |
 | P5 | **Fase 2:** tuning anti-desbalance | `eda\07_oversampling_dataset_v3.py` + `tuned_v1` | ✅ **E19–E21** (hallazgo negativo documentado) |
-| P6 | Fallback pre-registrado: yolov8s sobre dataset_v3 | `--model yolov8s.pt --name tuned_v2_s` | 🔄 en background (E22) |
+| P6 | Fallback pre-registrado: yolov8s sobre dataset_v3 | `--model yolov8s.pt --name tuned_v2_s` | ✅ **E23** (44 épocas, ~49 min) |
 | P7 | **Fase 3:** núcleo del agente + demo con métrica de incidente | `src\safesite\` (7 módulos) + `-m src.safesite.demo` | ✅ **E22** (criterio CUMPLIDO a nivel de incidente: no_helmet 0.778 val / 0.792 test) |
-| P8 | Comparar `tuned_v2_s` vs `baseline_v1` en métrica de incidente; elegir checkpoint de despliegue | re-demo con `config.RUTA_MODELO` cambiado | ⬜ (al completar P6) |
-| P9 | **Fase 4:** WhatsApp real (credenciales Meta + plantilla `alerta_epp`) + panel + fuente de video real (webcam/RTSP) | `actuarios.py` + `percepcion.py` | ⬜ |
+| P8 | Comparar `tuned_v2_s` vs `baseline_v1` en métrica de incidente; elegir checkpoint de despliegue | `--modelo runs/safesite/tuned_v2_s/weights/best.pt --device 0` | ✅ **E23** — **tuned_v2_s gana** (no_helmet 0.963 val / 0.833 test; escena 0.962 test); `config.RUTA_MODELO` actualizado |
+| P9 | **Fase 4:** WhatsApp real (credenciales Meta + plantilla `alerta_epp`) + panel + fuente de video real (webcam/RTSP) | `actuarios.py` + `percepcion.py` | ⬜ próxima |
 
 > **Regla de la bitácora:** al completar P5+ se añaden nuevas entradas con fecha, comando exacto, duración, métricas y decisión tomada.

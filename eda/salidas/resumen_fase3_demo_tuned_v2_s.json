@@ -1,0 +1,131 @@
+{
+  "config": {
+    "modelo": "runs/safesite/tuned_v2_s/weights/best.pt",
+    "device": "0",
+    "umbral_incumplimiento": 0.15,
+    "k_frames_confirmacion": 3,
+    "cooldown_s": 30.0,
+    "frames_por_escena": 4
+  },
+  "nota_metodologica": "train inflado por memorizacion; el recall creible es val/test. Simulacion = 4 frames identicos por escena a 2 FPS; en video real el recall de incidente tiende a ser mayor.",
+  "por_split": {
+    "train": {
+      "escenas_incidente": 239,
+      "escenas_control": 891,
+      "recall_por_clase": {
+        "no_goggle": {
+          "fotograma(>=1 frame)": 0.481,
+          "incidente(agente, K frames)": 0.481,
+          "n_escenas_gt": 216
+        },
+        "no_gloves": {
+          "fotograma(>=1 frame)": 0.894,
+          "incidente(agente, K frames)": 0.894,
+          "n_escenas_gt": 189
+        },
+        "no_boots": {
+          "fotograma(>=1 frame)": 0.964,
+          "incidente(agente, K frames)": 0.964,
+          "n_escenas_gt": 28
+        },
+        "no_helmet": {
+          "fotograma(>=1 frame)": 0.935,
+          "incidente(agente, K frames)": 0.935,
+          "n_escenas_gt": 231
+        }
+      },
+      "recall_escena_cualquier_no": 0.979,
+      "falsas_alarmas_control": {
+        "escenas_con_alerta": 28,
+        "tasa": 0.031,
+        "por_clase": {
+          "no_goggle": 1,
+          "no_gloves": 15,
+          "no_boots": 6,
+          "no_helmet": 13
+        }
+      },
+      "alertas_emitidas": 589
+    },
+    "val": {
+      "escenas_incidente": 28,
+      "escenas_control": 115,
+      "recall_por_clase": {
+        "no_goggle": {
+          "fotograma(>=1 frame)": 0.44,
+          "incidente(agente, K frames)": 0.44,
+          "n_escenas_gt": 25
+        },
+        "no_gloves": {
+          "fotograma(>=1 frame)": 0.783,
+          "incidente(agente, K frames)": 0.783,
+          "n_escenas_gt": 23
+        },
+        "no_boots": {
+          "fotograma(>=1 frame)": 0.0,
+          "incidente(agente, K frames)": 0.0,
+          "n_escenas_gt": 2
+        },
+        "no_helmet": {
+          "fotograma(>=1 frame)": 0.963,
+          "incidente(agente, K frames)": 0.963,
+          "n_escenas_gt": 27
+        }
+      },
+      "recall_escena_cualquier_no": 0.964,
+      "falsas_alarmas_control": {
+        "escenas_con_alerta": 4,
+        "tasa": 0.035,
+        "por_clase": {
+          "no_boots": 3,
+          "no_helmet": 1,
+          "no_gloves": 1
+        }
+      },
+      "alertas_emitidas": 63
+    },
+    "test": {
+      "escenas_incidente": 26,
+      "escenas_control": 114,
+      "recall_por_clase": {
+        "no_goggle": {
+          "fotograma(>=1 frame)": 0.542,
+          "incidente(agente, K frames)": 0.542,
+          "n_escenas_gt": 24
+        },
+        "no_gloves": {
+          "fotograma(>=1 frame)": 0.652,
+          "incidente(agente, K frames)": 0.652,
+          "n_escenas_gt": 23
+        },
+        "no_boots": {
+          "fotograma(>=1 frame)": 0.333,
+          "incidente(agente, K frames)": 0.333,
+          "n_escenas_gt": 6
+        },
+        "no_helmet": {
+          "fotograma(>=1 frame)": 0.833,
+          "incidente(agente, K frames)": 0.833,
+          "n_escenas_gt": 24
+        }
+      },
+      "recall_escena_cualquier_no": 0.962,
+      "falsas_alarmas_control": {
+        "escenas_con_alerta": 3,
+        "tasa": 0.026,
+        "por_clase": {
+          "no_gloves": 2,
+          "no_boots": 1
+        }
+      },
+      "alertas_emitidas": 58
+    }
+  },
+  "ejecucion": {
+    "frames_procesados": 5652,
+    "latencia_media_ms": 31.5,
+    "latencia_max_ms": 3932.3,
+    "alertas_emitidas": 710,
+    "alertas_bloqueadas_por_cooldown": 0
+  }
+}
