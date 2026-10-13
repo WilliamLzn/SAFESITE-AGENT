@@ -20,3 +20,9 @@ dataset_v3/
 # --- Sistema ---
 Thumbs.db
 .DS_Store
+
+# --- secretos (NUNCA versionar) ---
+.env
+
+# --- secretos (NUNCA versionar) ---
+.env

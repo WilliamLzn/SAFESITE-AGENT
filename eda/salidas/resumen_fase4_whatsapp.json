@@ -1,0 +1,13 @@
+{
+  "prueba": "end-to-end WhatsApp (Fase 4)",
+  "modelo": "runs\\safesite\\tuned_v2_s\\weights\\best.pt",
+  "device": "0",
+  "split": "val",
+  "escenas_procesadas": 3,
+  "escenas_con_alerta_whatsapp": 2,
+  "llamadas_http_api": 6,
+  "latencia_whatsapp_media_ms": 2637.8,
+  "latencia_whatsapp_max_ms": 4103.7,
+  "latencia_agente_media_ms": 1838.5,
+  "duracion_total_s": 20.2
+}

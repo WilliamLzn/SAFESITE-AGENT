@@ -416,6 +416,39 @@ Recall A NIVEL DE INCIDENTE (¿alertó el agente la clase correcta en la escena?
 
 **Artefactos:** `eda/salidas/metricas_tuned_v2_s.json` (val/test por fotograma), `eda/salidas/resumen_fase3_demo_tuned_v2_s.json` (incidente), `runs/safesite/tuned_v2_s/` (run completo).
 
+### E24 — FASE 4 (parte 1) COMPLETADA: alertas REALES de WhatsApp con evidencia ✅
+
+**Configuración de credenciales (Meta Business Cloud API):**
+- App `safesite-agent` creada por el usuario en developers.facebook.com (tipo Business, producto WhatsApp)
+- **Token permanente** de System User (~199 chars) — el usuario lo configuró directamente en las variables de entorno de Windows (`setx`) y **nunca pasó por el chat ni por git** (lección aplicada tras exponer el temporal: auto-expira, no se repitió el patrón)
+- Credenciales centralizadas en **`.env`** (gitignored, verificado con `git check-ignore`): `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_DESTINATARIO=573185469893` (número personal del usuario — hará de supervisor HSE en el piloto)
+- Mini-loader de `.env` en `src/safesite/__init__.py` (sin dependencias; `os.environ.setdefault` — el entorno real tiene prioridad). **Bug documentado:** PowerShell `Set-Content -Encoding utf8` escribe BOM (`EF BB BF`, verificado en bytes) que contaminaba la primera clave → corregido leyendo con `utf-8-sig`
+
+**Verificaciones previas:**
+1. Validez del token: `GET /me` → `{"name": "WilliamLzn"}` ✅
+2. Mensaje de texto manual: `messages[0].id = wamid.HBgMNTcz...` ✅ (el destinatario estaba en la lista de permitidos del número de prueba — sin error 131047)
+3. Hallazgo técnico de PowerShell: pasar JSON con comillas a `curl.exe` desde PowerShell mutila las comillas → error `#100 messaging_product required` — resuelto con `Invoke-RestMethod` (el agente usa Python/requests, inmune a esto)
+
+**`ActuadorWhatsApp` extendido (envío real con evidencia):**
+- Flujo de 2 pasos de la API Cloud: `POST /{phone_id}/media` (JPEG del frame anotado, desde memoria vía `cv2.imencode`, calidad 85) → `media_id` → `POST /messages` con `image.id` + caption (`Zona | INCUMPLIMIENTO: clase | conf | hora`)
+- **Degradación elegante**: si falla la imagen → texto puro; la alerta nunca se pierde
+- Modo texto libre (válido con número de prueba hacia permitidos); método `construir_payload` (plantilla `alerta_epp`) preservado para producción con número de negocio
+- `modo` automático: `ENVIO-REAL` solo si las 3 variables existen; si no, `DRY-RUN`
+
+**Prueba end-to-end (`src/safesite/prueba_whatsapp.py`, 3 escenas de incidente de val, GPU):**
+
+| Resultado | Valor |
+|---|---|
+| Escenas con alerta WhatsApp real | **2/3** (la 3ª fue de las que el modelo no detecta — consistente con recall de incidente 96.3%) |
+| Mensajes enviados con imagen+caption | **3** (uno por clase confirmada) |
+| Latencia HTTP a la API de Meta | media **2.64 s**, máx 4.10 s por llamada |
+| Latencia del ciclo completo del agente | media 1.84 s (incluye los envíos) |
+| **Objetivo del README: alerta < 10 s** | ✅ **CUMPLIDO**: percepción 31.5 ms + subida de imagen ~2.6 s + envío ~2.6 s ≈ **5.3 s end-to-end** |
+
+**Artefactos:** `src/safesite/prueba_whatsapp.py` (reproducible con `--escenas N --split val --device 0`), `eda/salidas/resumen_fase4_whatsapp.json`, `src/safesite/{__init__,actuarios}.py` actualizados.
+
+**Pendiente de Fase 4:** fuente de video real (webcam del portátil o RTSP de cámara IP) en `percepcion.py` → con eso el pipeline queda 100% conectado al mundo físico.
+
 ---
 
 ## 📊 Tabla resumen del EDA (para evaluación rápida)

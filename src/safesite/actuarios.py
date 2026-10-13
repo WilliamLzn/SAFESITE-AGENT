@@ -48,28 +48,135 @@ class ActuadorConsola(ActuadorBase):
 
 
 class ActuadorWhatsApp(ActuadorBase):
-    """Announcer de WhatsApp Business Cloud API (modo DRY-RUN sin credenciales).
+    """Announcer de WhatsApp Business Cloud API (Meta).
 
-    Plantilla del mensaje (los parametros se mapean 1:1 a la API de Meta):
-      template: alerta_epp  |  lenguage: es
-      params: [zona, clase_de_epp_faltante, hora_local, conf]
-    Adjunto: frame anotado del incidente (media del mensaje).
+    Credenciales por variables de entorno (NUNCA en el codigo/git):
+      - WHATSAPP_TOKEN         (token de System User, permanente)
+      - WHATSAPP_PHONE_ID      (ID del numero de la app)
+      - WHATSAPP_DESTINATARIO  (celular del supervisor, ej. 573185469893)
+
+    Modo de envio: texto libre + IMAGEN del frame anotado (valido con el
+    numero de prueba de Meta hacia los destinatarios permitidos). Para pasar
+    a produccion (numero de negocio real) se usara la plantilla `alerta_epp`
+    aprobada por Meta (metodo construir_payload, ya implementado).
+
+    Flujo de la imagen (API Cloud, 2 pasos):
+      1) POST /{phone_id}/media   -> sube el JPEG y devuelve media_id
+      2) POST /{phone_id}/messages -> envia el mensaje con image.id + caption
+    Si la subida falla, degrada a texto puro: la alerta nunca se pierde.
     """
 
     nombre = "whatsapp"
+    API_VERSION = "v21.0"
 
     def __init__(self, telefono_destinatario=None,
                  token_env="WHATSAPP_TOKEN", phone_id_env="WHATSAPP_PHONE_ID"):
-        import os as _os
-        self.destinatario = telefono_destinatario
-        self.token = _os.environ.get(token_env)
-        self.phone_id = _os.environ.get(phone_id_env)
+        self.destinatario = telefono_destinatario or os.environ.get(
+            "WHATSAPP_DESTINATARIO")
+        self.token = os.environ.get(token_env)
+        self.phone_id = os.environ.get(phone_id_env)
+        self.tiempos_envio_ms = []
 
     @property
     def modo(self):
-        return "ENVIO-REAL" if (self.token and self.phone_id) else "DRY-RUN"
+        return "ENVIO-REAL" if (self.token and self.phone_id
+                                and self.destinatario) else "DRY-RUN"
+
+    # ---------- capa HTTP ----------
+
+    def _headers(self):
+        return {"Authorization": f"Bearer {self.token}"}
+
+    def _url(self, ruta):
+        return (f"https://graph.facebook.com/{self.API_VERSION}/"
+                f"{self.phone_id}/{ruta}")
+
+    def _post(self, ruta, json=None, data=None, files=None):
+        import requests
+        import time
+        t0 = time.perf_counter()
+        resp = requests.post(self._url(ruta), headers=self._headers(),
+                             json=json, data=data, files=files, timeout=30)
+        self.tiempos_envio_ms.append((time.perf_counter() - t0) * 1000)
+        return resp
+
+    # ---------- envios ----------
+
+    def enviar_texto(self, texto):
+        """Envia un mensaje de texto libre. Devuelve el wamid."""
+        resp = self._post("messages", json={
+            "messaging_product": "whatsapp", "to": self.destinatario,
+            "type": "text", "text": {"body": texto},
+        })
+        resp.raise_for_status()
+        return resp.json()["messages"][0]["id"]
+
+    def subir_imagen_bytes(self, jpeg_bytes, nombre="alerta.jpg"):
+        """Paso 1: sube el JPEG (en memoria) y devuelve el media_id."""
+        resp = self._post("media", data={"messaging_product": "whatsapp",
+                                         "type": "image"},
+                          files={"file": (nombre, jpeg_bytes, "image/jpeg")})
+        resp.raise_for_status()
+        return resp.json()["id"]
+
+    def enviar_imagen(self, media_id, caption):
+        """Paso 2: envia el mensaje con la imagen subida + caption."""
+        resp = self._post("messages", json={
+            "messaging_product": "whatsapp", "to": self.destinatario,
+            "type": "image", "image": {"id": media_id, "caption": caption},
+        })
+        resp.raise_for_status()
+        return resp.json()["messages"][0]["id"]
+
+    # ---------- interfaz del actuador ----------
+
+    @staticmethod
+    def _caption(incidente):
+        from datetime import datetime
+        return (f"SafeSite-Agent - Zona: {incidente.zona} | "
+                f"INCUMPLIMIENTO: {incidente.clase} | "
+                f"conf {incidente.conf_media:.0%} | "
+                f"{datetime.fromtimestamp(incidente.t_confirmacion).strftime('%H:%M:%S')}")
+
+    def alertar(self, incidente, frame_anotado=None, ruta_frame=None):
+        caption = self._caption(incidente)
+        if self.modo != "ENVIO-REAL":
+            print(f"📲 WhatsApp[DRY-RUN] -> {caption} "
+                  f"(sin credenciales en el entorno)")
+            return None
+
+        # 1) intentar con la imagen del frame anotado
+        if frame_anotado is not None:
+            try:
+                import cv2
+                ok, buf = cv2.imencode(".jpg", frame_anotado,
+                                       [cv2.IMWRITE_JPEG_QUALITY, 85])
+                if not ok:
+                    raise RuntimeError("cv2.imencode fallo")
+                media_id = self.subir_imagen_bytes(buf.tobytes(),
+                                                   nombre="safesite_alerta.jpg")
+                wamid = self.enviar_imagen(media_id, caption)
+                print(f"📲 WhatsApp[ENVIO-REAL] imagen+caption enviado "
+                      f"(wamid {wamid[:18]}...)")
+                return wamid
+            except Exception as e:
+                print(f"⚠️ WhatsApp: fallo el envio con imagen ({e}); "
+                      f"degradando a texto puro")
+
+        # 2) fallback: texto puro (la alerta nunca se pierde)
+        try:
+            wamid = self.enviar_texto(caption)
+            print(f"📲 WhatsApp[ENVIO-REAL] texto enviado "
+                  f"(wamid {wamid[:18]}...)")
+            return wamid
+        except Exception as e:
+            print(f"❌ WhatsApp: fallo tambien el envio de texto: {e}")
+            return None
+
+    # ---------- plantilla (produccion con numero de negocio real) ----------
 
     def construir_payload(self, incidente):
+        """Payload con plantilla `alerta_epp` (requerida en produccion)."""
         from datetime import datetime
         return {
             "messaging_product": "whatsapp",
@@ -92,16 +199,3 @@ class ActuadorWhatsApp(ActuadorBase):
                 }],
             },
         }
-
-    def alertar(self, incidente, frame_anotado=None, ruta_frame=None):
-        payload = self.construir_payload(incidente)
-        print(f"📲 WhatsApp[{self.modo}] -> payload listo: {payload}")
-        if self.modo == "ENVIO-REAL":
-            import requests
-            url = (f"https://graph.facebook.com/v21.0/{self.phone_id}/messages")
-            resp = requests.post(
-                url, json=payload,
-                headers={"Authorization": f"Bearer {self.token}"}, timeout=15)
-            print(f"   respuesta API: {resp.status_code}")
-            return resp.status_code
-        return None
