@@ -446,6 +446,29 @@ Recall A NIVEL DE INCIDENTE (¿alertó el agente la clase correcta en la escena?
 
 **Artefactos:** `src/safesite/{actuarios,agente,servidor_webhook,prueba_whatsapp,piloto}.py` actualizados, `eda/salidas/resumen_fase4_whatsapp.json`.
 
+### E27 — FASE 4 (final) COMPLETADA: panel web con detección EN VIVO por webcam ✅
+
+**Petición del usuario:** frontend básico pero funcional para detectar en TIEMPO REAL por su webcam si una persona tiene o no sus EPP.
+
+**Construido — `src/safesite/panel.py`** (única dependencia nueva: Flask 3.1.3):
+- **Arquitectura de 3 hilos** para que nada se congele:
+  1. *Captura*: webcam (CAP_DSHOW, 1280×720) → `agente.procesar_frame` (percepción → razonamiento K=3 → memoria/cooldown — el pipeline completo intacto) → frame anotado compartido bajo lock
+  2. *Worker WhatsApp*: `ActuadorWhatsAppAsync` encola los lotes y el worker los envía por HTTP — **el video nunca se congela durante un envío de 1-3 s**
+  3. *Flask*: `/` (panel HTML), `/video` (MJPEG ~15 FPS al navegador), `/estado` (JSON: conteos por clase, FPS, latencia, incidentes)
+- **Panel**: tema oscuro, video con cajas (verde = EPP presente, rojo = incumplimiento), tarjetas de conteo por clase, log de incidentes con hora/confianza/frames, indicador de FPS
+- **El circuito conversacional sigue vivo durante la sesión** (la Memoria escribe el historial → el webhook INFO del piloto responde con métricas del último lote en vivo)
+
+**Verificado en el arranque:** webcam 1280×720 abierta, ~5 FPS con yolov8s en GPU (73 ms/frame), WhatsApp en ENVIO-REAL, `/estado` respondiendo. **El agente quedó 100% conectado al mundo físico**: webcam → detección → confirmación → WhatsApp con foto, en < 1 s de confirmación + ~2.6 s de envío.
+
+**Arquitectura completa del proyecto (todas las fases del roadmap cerradas):**
+```
+webcam → percepcion(YOLO tuned_v2_s) → razonamiento(K frames, umbrales por clase)
+       → memoria(cooldown + historial) → actuadores(consola/panel + WhatsApp async)
+       ⇄ supervisor: responde INFO → webhook → métricas del lote
+```
+
+**Artefactos:** `src/safesite/panel.py`; ejecución: `.venv\Scripts\python.exe -m src.safesite.panel` → http://localhost:5000
+
 ### E24 — FASE 4 (parte 1) COMPLETADA: alertas REALES de WhatsApp con evidencia ✅
 
 **Configuración de credenciales (Meta Business Cloud API):**
