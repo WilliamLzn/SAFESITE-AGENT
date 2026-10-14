@@ -469,6 +469,25 @@ webcam → percepcion(YOLO tuned_v2_s) → razonamiento(K frames, umbrales por c
 
 **Artefactos:** `src/safesite/panel.py`; ejecución: `.venv\Scripts\python.exe -m src.safesite.panel` → http://localhost:5000
 
+### E28 — VALIDACIÓN EN VIVO CON WEBCAM REAL ✅ (evidencia de logs)
+
+El usuario probó el panel frente a su propia cámara (sesión 16:58–17:02, log de Flask). Resultado registrado por el sistema:
+
+```
+16:58:51 🚨 ALERTA [consola] zona=obra_cam1 lote=1: no_helmet (18%)
+         📨 encolado para WhatsApp → 📲 imagen+caption enviado (wamid ...)
+16:58:52 🚨 ALERTA zona=obra_cam1 lote=1: no_gloves (27%) → enviado
+16:58:54 🚨 ALERTA zona=obra_cam1 lote=1: no_goggle (20%) → enviado
+```
+
+**Confirmaciones de la sesión en vivo:**
+1. **Pipeline completo funcionando en tiempo real con persona real**: webcam → detección → confirmación K=3 (~0.6 s a 5 FPS) → WhatsApp con foto de la cámara → **en ~2.6 s por alerta**. El agente quedó conectado al mundo físico de punta a punta.
+2. **El worker asíncrono cumplió su cometido**: los 3 envíos HTTP (1.6–2.1 s cada uno) NO congelaron el video — el stream siguió fluido (el navegador pidió `/estado` sin interrupciones durante los envíos).
+3. **Circuito conversacional en vivo**: el webhook del piloto registró dos `info` más del supervisor (ambos respondidos con las métricas del lote) y mensajes no reconocidos ('hola', otros) recibieron la respuesta de fallback diseñada — **el agente nunca ejecuta nada que llegue por chat; solo responde con mensajes fijos** (buen margen de seguridad).
+4. Observación de calibración: sin EPP real frente a la cámara, el modelo detectó `no_helmet` (18%), `no_gloves` (27%) y `no_goggle` (20%) — comportamientos correctos para una persona genuinamente sin EPP; las confianzas bajas (cerca del umbral 0.15) son el rango donde el diseño de razonamiento temporal hace su trabajo.
+
+**Nota operativa:** los procesos de sesión (`piloto.py`, `panel.py`) mueren si se reinicia la máquina/servidor de OpenCode. Relanzamiento (documentado en AGENTS.md): `.venv\Scripts\python.exe -m src.safesite.piloto` (webhook+túnel, se auto-registra solo) y `.venv\Scripts\python.exe -m src.safesite.panel` (webcam+panel).
+
 ### E24 — FASE 4 (parte 1) COMPLETADA: alertas REALES de WhatsApp con evidencia ✅
 
 **Configuración de credenciales (Meta Business Cloud API):**
