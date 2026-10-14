@@ -21,8 +21,5 @@ dataset_v3/
 Thumbs.db
 .DS_Store
 
-# --- secretos (NUNCA versionar) ---
-.env
-
-# --- secretos (NUNCA versionar) ---
+# --- Secretos (NUNCA versionar) ---
 .env

@@ -24,13 +24,26 @@ SEED = 42
 def extraer_metricas(metricas):
     """Serializa las metricas de validacion de ultralytics (global + por clase)."""
     box = metricas.box
-    nombres = metricas.names.values() if hasattr(metricas, "names") else {}
+    # Fix E29: antes se hacia `names.values()` y `i in nombres` (int entre strings)
+    # -> siempre caia al fallback clase_{i}. Normalizar a dict {int: nombre}.
+    nombres_raw = getattr(metricas, "names", None) or {}
+    if hasattr(nombres_raw, "items"):
+        nombres = {}
+        for k, v in nombres_raw.items():
+            try:
+                nombres[int(k)] = v
+            except (TypeError, ValueError):
+                pass
+    elif isinstance(nombres_raw, (list, tuple)):
+        nombres = dict(enumerate(nombres_raw))
+    else:
+        nombres = {}
     por_clase = {}
     ap50 = list(box.ap50)
     ap5095 = list(box.ap)
     for idx_cls in box.ap_class_index:
         i = int(idx_cls)
-        clave = nombres[i] if i in nombres else f"clase_{i}"
+        clave = nombres.get(i, f"clase_{i}")
         por_clase[clave] = {
             "AP50": round(ap50[i], 4) if i < len(ap50) else None,
             "AP50-95": round(ap5095[i], 4) if i < len(ap5095) else None,

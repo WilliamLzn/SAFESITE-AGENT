@@ -416,6 +416,39 @@ Recall A NIVEL DE INCIDENTE (¿alertó el agente la clase correcta en la escena?
 
 **Artefactos:** `eda/salidas/metricas_tuned_v2_s.json` (val/test por fotograma), `eda/salidas/resumen_fase3_demo_tuned_v2_s.json` (incidente), `runs/safesite/tuned_v2_s/` (run completo).
 
+### E24 — FASE 4 (parte 1) COMPLETADA: alertas REALES de WhatsApp con evidencia ✅
+
+**Configuración de credenciales (Meta Business Cloud API):**
+- App `safesite-agent` creada por el usuario en developers.facebook.com (tipo Business, producto WhatsApp)
+- **Token permanente** de System User (~199 chars) — el usuario lo configuró directamente en las variables de entorno de Windows (`setx`) y **nunca pasó por el chat ni por git** (lección aplicada tras exponer el temporal: auto-expira, no se repitió el patrón)
+- Credenciales centralizadas en **`.env`** (gitignored, verificado con `git check-ignore`): `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_DESTINATARIO=573185469893` (número personal del usuario — hará de supervisor HSE en el piloto)
+- Mini-loader de `.env` en `src/safesite/__init__.py` (sin dependencias; `os.environ.setdefault` — el entorno real tiene prioridad). **Bug documentado:** PowerShell `Set-Content -Encoding utf8` escribe BOM (`EF BB BF`, verificado en bytes) que contaminaba la primera clave → corregido leyendo con `utf-8-sig`
+
+**Verificaciones previas:**
+1. Validez del token: `GET /me` → `{"name": "WilliamLzn"}` ✅
+2. Mensaje de texto manual: `messages[0].id = wamid.HBgMNTcz...` ✅ (el destinatario estaba en la lista de permitidos del número de prueba — sin error 131047)
+3. Hallazgo técnico de PowerShell: pasar JSON con comillas a `curl.exe` desde PowerShell mutila las comillas → error `#100 messaging_product required` — resuelto con `Invoke-RestMethod` (el agente usa Python/requests, inmune a esto)
+
+**`ActuadorWhatsApp` extendido (envío real con evidencia):**
+- Flujo de 2 pasos de la API Cloud: `POST /{phone_id}/media` (JPEG del frame anotado, desde memoria vía `cv2.imencode`, calidad 85) → `media_id` → `POST /messages` con `image.id` + caption (`Zona | INCUMPLIMIENTO: clase | conf | hora`)
+- **Degradación elegante**: si falla la imagen → texto puro; la alerta nunca se pierde
+- Modo texto libre (válido con número de prueba hacia permitidos); método `construir_payload` (plantilla `alerta_epp`) preservado para producción con número de negocio
+- `modo` automático: `ENVIO-REAL` solo si las 3 variables existen; si no, `DRY-RUN`
+
+**Prueba end-to-end (`src/safesite/prueba_whatsapp.py`, 3 escenas de incidente de val, GPU):**
+
+| Resultado | Valor |
+|---|---|
+| Escenas con alerta WhatsApp real | **2/3** (la 3ª fue de las que el modelo no detecta — consistente con recall de incidente 96.3%) |
+| Mensajes enviados con imagen+caption | **3** (uno por clase confirmada) |
+| Latencia HTTP a la API de Meta | media **2.64 s**, máx 4.10 s por llamada |
+| Latencia del ciclo completo del agente | media 1.84 s (incluye los envíos) |
+| **Objetivo del README: alerta < 10 s** | ✅ **CUMPLIDO**: percepción 31.5 ms + subida de imagen ~2.6 s + envío ~2.6 s ≈ **5.3 s end-to-end** |
+
+**Artefactos:** `src/safesite/prueba_whatsapp.py` (reproducible con `--escenas N --split val --device 0`), `eda/salidas/resumen_fase4_whatsapp.json`, `src/safesite/{__init__,actuarios}.py` actualizados.
+
+**Pendiente de Fase 4:** fuente de video real (webcam del portátil o RTSP de cámara IP) en `percepcion.py` → con eso el pipeline queda 100% conectado al mundo físico.
+
 ### E25 — FASE 4 (parte 2): circuito conversacional completo (webhook bidireccional) ✅
 
 **Petición del usuario:** mensajes menos técnicos (lenguaje natural + métricas bajo demanda respondiendo INFO).
@@ -488,38 +521,18 @@ El usuario probó el panel frente a su propia cámara (sesión 16:58–17:02, lo
 
 **Nota operativa:** los procesos de sesión (`piloto.py`, `panel.py`) mueren si se reinicia la máquina/servidor de OpenCode. Relanzamiento (documentado en AGENTS.md): `.venv\Scripts\python.exe -m src.safesite.piloto` (webhook+túnel, se auto-registra solo) y `.venv\Scripts\python.exe -m src.safesite.panel` (webcam+panel).
 
-### E24 — FASE 4 (parte 1) COMPLETADA: alertas REALES de WhatsApp con evidencia ✅
+### E29 — Sesión de cierre (14-oct): arreglos menores documentados + puesta al día de la documentación 🧹
 
-**Configuración de credenciales (Meta Business Cloud API):**
-- App `safesite-agent` creada por el usuario en developers.facebook.com (tipo Business, producto WhatsApp)
-- **Token permanente** de System User (~199 chars) — el usuario lo configuró directamente en las variables de entorno de Windows (`setx`) y **nunca pasó por el chat ni por git** (lección aplicada tras exponer el temporal: auto-expira, no se repitió el patrón)
-- Credenciales centralizadas en **`.env`** (gitignored, verificado con `git check-ignore`): `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_DESTINATARIO=573185469893` (número personal del usuario — hará de supervisor HSE en el piloto)
-- Mini-loader de `.env` en `src/safesite/__init__.py` (sin dependencias; `os.environ.setdefault` — el entorno real tiene prioridad). **Bug documentado:** PowerShell `Set-Content -Encoding utf8` escribe BOM (`EF BB BF`, verificado en bytes) que contaminaba la primera clave → corregido leyendo con `utf-8-sig`
+Tras el reinicio del servidor de OpenCode (los procesos `piloto.py`/`panel.py` mueren con él — nota de E28; no estaban corriendo al reiniciarse). Sin nuevos entrenamientos ni ejecuciones de GPU; se cerraron los pendientes menores que la propia bitácora había documentado:
 
-**Verificaciones previas:**
-1. Validez del token: `GET /me` → `{"name": "WilliamLzn"}` ✅
-2. Mensaje de texto manual: `messages[0].id = wamid.HBgMNTcz...` ✅ (el destinatario estaba en la lista de permitidos del número de prueba — sin error 131047)
-3. Hallazgo técnico de PowerShell: pasar JSON con comillas a `curl.exe` desde PowerShell mutila las comillas → error `#100 messaging_product required` — resuelto con `Invoke-RestMethod` (el agente usa Python/requests, inmune a esto)
-
-**`ActuadorWhatsApp` extendido (envío real con evidencia):**
-- Flujo de 2 pasos de la API Cloud: `POST /{phone_id}/media` (JPEG del frame anotado, desde memoria vía `cv2.imencode`, calidad 85) → `media_id` → `POST /messages` con `image.id` + caption (`Zona | INCUMPLIMIENTO: clase | conf | hora`)
-- **Degradación elegante**: si falla la imagen → texto puro; la alerta nunca se pierde
-- Modo texto libre (válido con número de prueba hacia permitidos); método `construir_payload` (plantilla `alerta_epp`) preservado para producción con número de negocio
-- `modo` automático: `ENVIO-REAL` solo si las 3 variables existen; si no, `DRY-RUN`
-
-**Prueba end-to-end (`src/safesite/prueba_whatsapp.py`, 3 escenas de incidente de val, GPU):**
-
-| Resultado | Valor |
+| Fix | Detalle |
 |---|---|
-| Escenas con alerta WhatsApp real | **2/3** (la 3ª fue de las que el modelo no detecta — consistente con recall de incidente 96.3%) |
-| Mensajes enviados con imagen+caption | **3** (uno por clase confirmada) |
-| Latencia HTTP a la API de Meta | media **2.64 s**, máx 4.10 s por llamada |
-| Latencia del ciclo completo del agente | media 1.84 s (incluye los envíos) |
-| **Objetivo del README: alerta < 10 s** | ✅ **CUMPLIDO**: percepción 31.5 ms + subida de imagen ~2.6 s + envío ~2.6 s ≈ **5.3 s end-to-end** |
+| **Serializador de métricas** (`src/entrenamiento/entrenar_baseline.py`) | Bug de E17 punto 4: `names.values()` + `i in nombres` (entero buscado entre strings) caía SIEMPRE al fallback `clase_{i}` → normalizado a dict `{int: nombre}` con manejo robusto (dict con claves int/str, list, o atributo ausente). Aplica a corridas futuras; los JSON ya generados conservan `clase_i` con el mapping documentado (orden de `dataset.yaml`: 0=helmet … 10=no_boots). |
+| **`ROADMAP_AGENTE.md`** | Puesto al día con el estado REAL de ejecución: Fases 0–4 ✅ con referencias a bitácora, Fase 5 al día (2 de 3 ítems), cronograma marcado y "próximas acciones" sustituidas por P10–P13. También se normalizó su codificación (mojibake del write matutino). |
+| **`.gitignore`** | Eliminado el bloque de `.env` duplicado; texto normalizado a UTF-8. |
+| **Bitácora (estructura)** | P9 marcado ✅ (decía "próxima" con la Fase 4 ya completa); entrada E24 reubicada en orden cronológico (había quedado tras E28 por orden de escritura); tabla resumen del EDA actualizada con los hallazgos ya resueltos; añadidos P10–P13 como pendientes de aprobación. |
 
-**Artefactos:** `src/safesite/prueba_whatsapp.py` (reproducible con `--escenas N --split val --device 0`), `eda/salidas/resumen_fase4_whatsapp.json`, `src/safesite/{__init__,actuarios}.py` actualizados.
-
-**Pendiente de Fase 4:** fuente de video real (webcam del portátil o RTSP de cámara IP) en `percepcion.py` → con eso el pipeline queda 100% conectado al mundo físico.
+**Estado de git al cierre:** `origin` = github.com/WilliamLzn/SAFESITE-AGENT con `origin/main` = `1798a95` (solo el commit base con el dataset crudo). Los 9 commits con TODO el trabajo (EDA, Fases 0–4, bitácora E1–E28) existen **solo en el disco local** → **P13 (push a GitHub) es la prioridad de respaldo**, pendiente de aprobación del usuario.
 
 ---
 
@@ -530,14 +543,14 @@ El usuario probó el panel frente a su propia cámara (sesión 16:58–17:02, lo
 | Imágenes analizadas (metadatos) | 1,413/1,416 en disco (100%) | ✅ |
 | Etiquetas verificadas | 1,129/1,129 txt ↔ NDJSON | ✅ 0 discrepancias |
 | Formato YOLO | Centro normalizado confirmado | ✅ sin bug |
-| Contaminación split | 112 test-oficial en train/ | 🔴 a corregir (Fase 0) |
-| Conjunto de validación | No existe | 🔴 a crear (Fase 0) |
-| Test etiquetado | 0/284 (posible trivialmente) | 🟠 Fase 0 |
-| Balance `no_*` | 13.6% cajas · 20.3% imágenes con `no_*` | 🟠 tuning Fase 2 |
-| `no_boots` | 115 cajas (1.00%) | 🟠 clase más débil |
-| Objetos pequeños | área mediana 1.85% de la imagen | 🟡 imgsz ≥ 640 |
-| Imágenes oscuras | 4.5% (<60 brillo, muestra n=200) | 🟡 augmentation |
-| Regla anidamiento casco⊂persona | falla 38.2% | 🟠 usar clases `no_*` |
+| Contaminación split | 112 test-oficial en train/ | ✅ resuelto (E12: `dataset_v2` con splits oficiales) |
+| Conjunto de validación | No existía | ✅ creado (E12: 143 imágenes) |
+| Test etiquetado | 0/284 | ✅ etiquetado (E12: 140/141 en disco) |
+| Balance `no_*` | 13.6% cajas · 20.3% imágenes con `no_*` | 🔬 explorado (E19–E23): oversampling no ayudó a yolov8n; yolov8s + métrica de incidente cumplieron el criterio |
+| `no_boots` | 115 cajas (1.00%) | 🟠 sigue siendo la clase más débil (n=2 escenas en val — E17) |
+| Objetos pequeños | área mediana 1.85% de la imagen | 🟡 imgsz ≥ 640 (aplicado) |
+| Imágenes oscuras | 4.5% (<60 brillo, muestra n=200) | 🟡 hsv_v=0.5 aplicado en tuned_v1 (E20) |
+| Regla anidamiento casco⊂persona | falla 38.2% | ✅ aplicado al diseño: `razonamiento.py` decide solo por clases `no_*` (E22) |
 
 ## ⏭️ Próximas ejecuciones planificadas (pendientes de aprobación)
 
@@ -551,6 +564,10 @@ El usuario probó el panel frente a su propia cámara (sesión 16:58–17:02, lo
 | P6 | Fallback pre-registrado: yolov8s sobre dataset_v3 | `--model yolov8s.pt --name tuned_v2_s` | ✅ **E23** (44 épocas, ~49 min) |
 | P7 | **Fase 3:** núcleo del agente + demo con métrica de incidente | `src\safesite\` (7 módulos) + `-m src.safesite.demo` | ✅ **E22** (criterio CUMPLIDO a nivel de incidente: no_helmet 0.778 val / 0.792 test) |
 | P8 | Comparar `tuned_v2_s` vs `baseline_v1` en métrica de incidente; elegir checkpoint de despliegue | `--modelo runs/safesite/tuned_v2_s/weights/best.pt --device 0` | ✅ **E23** — **tuned_v2_s gana** (no_helmet 0.963 val / 0.833 test; escena 0.962 test); `config.RUTA_MODELO` actualizado |
-| P9 | **Fase 4:** WhatsApp real (credenciales Meta + plantilla `alerta_epp`) + panel + fuente de video real (webcam/RTSP) | `actuarios.py` + `percepcion.py` | ⬜ próxima |
+| P9 | **Fase 4:** WhatsApp real (credenciales Meta + plantilla `alerta_epp`) + panel + fuente de video real (webcam/RTSP) | `actuarios.py` + `percepcion.py` | ✅ **E24–E27** (validación en vivo: E28) |
+| P10 | Calibrar `UMBRAL_INCUMPLIMIENTO` según falsas alarmas del piloto real (E28: confianzas 18–27% cerca del umbral 0.15) | `src/safesite/config.py` | ⬜ pendiente de aprobación |
+| P11 | Human-in-the-loop: canal para marcar falsos positivos/negativos → dataset de reentrenamiento | por diseñar | ⬜ pendiente de aprobación |
+| P12 | Túnel con nombre/dominio propio para producción (el quick tunnel cambia de URL en cada arranque) | cloudflared named tunnel | ⬜ pendiente de aprobación |
+| P13 | **Push a GitHub** (`origin` ya configurado) + respaldo externo del dataset crudo — no regenerable (E13) | `git push` | ⬜ pendiente de aprobación |
 
 > **Regla de la bitácora:** al completar P5+ se añaden nuevas entradas con fecha, comando exacto, duración, métricas y decisión tomada.
