@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Estado-Diseño_y_Dataset-blue?style=for-the-badge" alt="Estado">
-  <img src="https://img.shields.io/badge/Modelo-YOLO-brightgreen?style=for-the-badge&logo=python&logoColor=white" alt="Modelo">
-  <img src="https://img.shields.io/badge/Tarea-Detección_de_Objetos-yellow?style=for-the-badge" alt="Tarea">
+  <img src="https://img.shields.io/badge/Estado-Fases_0--4_✅_COMPLETADAS-brightgreen?style=for-the-badge" alt="Estado">
+  <img src="https://img.shields.io/badge/Modelo-YOLOv8s-0066CC?style=for-the-badge&logo=python&logoColor=white" alt="Modelo">
   <img src="https://img.shields.io/badge/Canal-WhatsApp_Business-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" alt="Canal">
+  <img src="https://img.shields.io/badge/Panel_Web-Flask_+_MJPEG-orange?style=for-the-badge" alt="Panel">
   <img src="https://img.shields.io/badge/Idioma-Español-red?style=for-the-badge" alt="Idioma">
 </p>
 
@@ -10,98 +10,116 @@
 
 <p align="center">
   <strong>Agente inteligente de monitoreo de seguridad en obra</strong><br/>
-  Detección de elementos de protección personal (EPP) en tiempo real sobre video de cámaras IP/CCTV
+  Detección de EPP en tiempo real · razonamiento temporal · alertas automáticas por WhatsApp
 </p>
 
 <p align="center">
   <em>Proyecto de Inteligencia Artificial — Universidad Tecnológica de Bolívar</em>
 </p>
 
----
-
-## 📌 Índice
-
-- [¿Qué es SafeSite-Agent?](#-qué-es-safesite-agent)
-- [El problema que resuelve](#-el-problema-que-resuelve)
-- [Cómo funciona (arquitectura del agente)](#-cómo-funciona)
-- [El dataset: Construction PPE](#-el-dataset-construction-ppe)
-- [Estructura del repositorio](#-estructura-del-repositorio)
-- [Quick Start](#-quick-start)
-- [Formato de etiquetas YOLO](#-formato-de-etiquetas-yolo)
-- [Estado del proyecto y roadmap](#-estado-del-proyecto-y-roadmap)
-- [Créditos](#-créditos)
+<p align="center">
+  <a href="#-resultados-medidos">📈 Resultados</a> •
+  <a href="#-quick-start">🚀 Quick Start</a> •
+  <a href="#-arquitectura-del-agente">⚙️ Arquitectura</a> •
+  <a href="#-dataset-construction-ppe">📊 Dataset</a> •
+  <a href="#-documentación">📚 Docs</a>
+</p>
 
 ---
 
 ## 🤖 ¿Qué es SafeSite-Agent?
 
-**SafeSite-Agent** es un agente de software diseñado para **percibir de forma continua** el video de las cámaras instaladas en un área piloto de una obra de construcción, **razonar** sobre lo observado y **actuar de manera autónoma** emitiendo alertas en tiempo real cuando detecta que un trabajador no usa su equipo de protección personal (casco, guantes, chaleco, entre otros).
+**SafeSite-Agent** es un agente que **percibe continuamente** el video de una obra de construcción (cámaras IP/CCTV o webcam), **razona** sobre lo observado con confirmación temporal y memoria anti-spam, y **actúa de forma autónoma** enviando alertas en tiempo real al supervisor HSE por **WhatsApp Business** cuando detecta a un trabajador sin su equipo de protección personal (casco, guantes, chaleco, gafas o botas).
 
-Se clasifica principalmente como un **model-based reflex agent** (agente reactivo basado en modelos) complementado con un componente de **utilidad** para priorizar alertas. Es decir, su decisión no depende solo del fotograma actual: mantiene un estado interno que le permite distinguir si un incumplimiento es un evento aislado o un patrón recurrente en una zona determinada.
+Desde la teoría de agentes, se clasifica como un **model-based reflex agent** (reactivo basado en modelos) con componente de **utilidad** para priorizar alertas: su decisión no depende solo del fotograma actual, sino de un estado interno (rachas por zona/clase + cooldown) que distingue un evento aislado de un patrón recurrente.
 
-> Su valor está en operar **sin pausas**, reducir el tiempo de reacción frente a incumplimientos y estandarizar un criterio de verificación que, a diferencia del ojo humano, no se ve afectado por la fatiga ni por la simultaneidad de eventos en la obra.
+> ✅ **Estado del proyecto:** el roadmap completo (Fases 0–4) está **implementado y validado** — incluyendo alertas reales de WhatsApp bidireccionales y un panel web con detección en vivo por webcam. La métrica de negocio pre-registrada (recall de incidente ≥ 0.70) se cumple con holgura: **96.3 % en validación**.
+
+---
+
+## 📈 Resultados medidos
+
+Checkpoint de despliegue: **`runs/safesite/tuned_v2_s/weights/best.pt`** (YOLOv8s, elegido por comparación de experimentos — ver `Documentation/BITACORA.md`).
+
+**Recuperación de incumplimientos a nivel de incidente/escena** (simulación de video, K=3 frames de confirmación):
+
+| Clase de riesgo | Recall val | Recall test |
+|---|---:|---:|
+| `no_helmet` (sin casco) | **96.3 %** | **83.3 %** |
+| `no_goggle` (sin gafas) | 44.0 % | 54.2 % |
+| `no_gloves` (sin guantes) | 78.3 % | 65.2 % |
+| `no_boots` (sin botas)¹ | 0.0 % | 33.3 % |
+| **Cualquier `no_*` en escena** | **96.4 %** | **96.2 %** |
+| **Falsas alarmas (escenas control)** | 3.5 % | 2.6 % |
+
+¹ Soporte muy bajo en val/test (2 y 6 escenas) → métrica poco fiable, ver EDA.
+
+**Rendimiento del pipeline:** ~31.5 ms/frame en GPU (RTX 4050) → sobrado para el objetivo de alerta < 10 s. Baseline original (YOLOv8n): mAP50 val 0.580 / test 0.520.
 
 ---
 
 ## 🚧 El problema que resuelve
 
-El incumplimiento en el uso de EPP es una de las **principales causas de accidentalidad** en el sector de la construcción. La supervisión manual tiene un límite claro: *un supervisor no puede observar de manera simultánea y continua todos los puntos críticos de una obra*.
+El incumplimiento en el uso de EPP es una de las principales causas de accidentalidad en construcción. La supervisión manual tiene un límite claro: *un supervisor no puede observar de forma simultánea y continua todos los puntos críticos de una obra*.
 
 | Limitación de la supervisión humana | Cómo lo aborda SafeSite-Agent |
-|-------------------------------------|-------------------------------|
+|---|---|
 | Monitoreo discontinuo y limitado | Observación continua del flujo de video |
-| Tiempo de reacción variable | Alertas automáticas en tiempo real |
-| Criterio subjetivo y afectado por la fatiga | Criterio estandarizado y consistente |
-| Difícil atender eventos simultáneos | Procesamiento paralelo del video de varias cámaras |
+| Tiempo de reacción variable | Alertas automáticas por WhatsApp en segundos |
+| Criterio subjetivo / fatiga | Criterio estandarizado (confirmación temporal K=3) |
+| Difícil atender eventos simultáneos | Memoria por zona/horario, sin notificaciones duplicadas |
 
-**Entorno de operación:** una obra de construcción (área piloto delimitada y puntos de acceso). Es un ambiente *parcialmente observable, estocástico, secuencial, dinámico y continuo*, gestionado por un **agente único**.
-
----
-
-## ⚙️ Cómo funciona
-
-El agente combina un modelo de visión por computador (**YOLO**) con reglas de decisión y memoria. El pipeline conceptual:
-
-```
-          ┌──────────────────────────────────────────────────────────────┐
-          │                   ENTORNO (obra de construcción)             │
-          │   cámaras IP/CCTV ▪ trabajadores ▪ condiciones del clima     │
-          └──────────────────────────────────────────────────────────────┘
-                                     │  video RGB
-                                     ▼
-   ┌───────────────────────────────────────────────────────────────────────────┐
-   │                       PERCEPCIÓN Y MANEJO DE ENTRADAS                     │
-   │   ▪ muestreo de fotogramas ▪ detección de personas ▪ clasificación de EPP │
-   │   ▪ metadatos de captura (marca de tiempo, zona, cámara)                  │
-   └───────────────────────────────────────────────────────────────────────────┘
-                                     │
-                                     ▼
-   ┌───────────────────────────────────────────────────────────────────────────┐
-   │                       RAZONAMIENTO Y TOMA DE DECISIONES                   │
-   │   ▪ reglas: EPP completo / incompleto                                     │
-   │   ▪ memoria de corto plazo (evita notificaciones duplicadas)              │
-   │   ▪ historial por zona y horario (prioriza patrones recurrentes)          │
-   └───────────────────────────────────────────────────────────────────────────┘
-                                     │
-                                     ▼
-   ┌───────────────────────────────────────────────────────────────────────────┐
-   │                               ACTUADORES                                  │
-   │   ▪ WhatsApp Business bot announcer → alerta al supervisor HSE            │
-   │   ▪ Panel de supervisión → video con bounding boxes superpuestos          │
-   │   ▪ Actualización de historial → persistente por zona/horario             │
-   └───────────────────────────────────────────────────────────────────────────┘
-```
-
-**Medidas de desempeño objetivo:**
-- ✅ Exactitud (accuracy) de detección de EPP **≥ 90 %** en el área piloto.
-- ⏱️ Alerta vía WhatsApp en **menos de 10 segundos** desde que se detecta el incumplimiento.
-- 📉 Reducción del **30 %** en el tiempo promedio de detección frente a la supervisión manual.
+**Entorno de operación:** obra de construcción (área piloto). Ambiente *parcialmente observable, estocástico, secuencial, dinámico y continuo*, gestionado por un **agente único**.
 
 ---
 
-## 📊 El dataset: Construction PPE
+## ⚙️ Arquitectura del agente
 
-Construido sobre el dataset oficial **Construction PPE** (Ultralytics) para la tarea de **detección de objetos**. Aporta los datos con los que se entrena el modelo de visión del agente.
+```
+                ┌─────────────────────────────────────────────────────┐
+                │            ENTORNO (obra de construcción)           │
+                │   webcam / cámaras IP ▪ trabajadores ▪ iluminación  │
+                └─────────────────────────────────────────────────────┘
+                                       │  frames RGB
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│ PERCEPCIÓN                      src/safesite/percepcion.py                       │
+│  ▪ YOLOv8s (tuned_v2_s/best.pt) ▪ umbrales por clase (no_* = 0.15, resto 0.35)   │
+│  ▪ decisión basada SOLO en clases no_* explícitas (evita el fallo 38.2% del      │
+│    anidamiento casco/persona — hallazgo F6 del EDA)                              │
+└──────────────────────────────────────────────────────────────────────────────────┘
+                                       │  detecciones + metadatos
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│ RAZONAMIENTO + MEMORIA        src/safesite/razonamiento.py · memoria.py          │
+│  ▪ confirmación temporal: K=3 frames consecutivos para confirmar incidente       │
+│  ▪ cooldown anti-spam: 30 s mínimo entre alertas del mismo (zona, clase)         │
+│  ▪ historial persistente por (zona, clase) en historial_incidentes.jsonl         │
+└──────────────────────────────────────────────────────────────────────────────────┘
+                                       │  incidentes confirmados
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│ ACTUADORES                       src/safesite/actuarios.py                       │
+│  ▪ WhatsApp Business: UN mensaje por incidente con TODAS las faltas + 1 foto     │
+│    ("Detectamos varios incumplimientos: • Sin Casco • Sin Guantes…")             │
+│  ▪ conversación bidireccional: el supervisor responde INFO → métricas técnicas   │
+│  ▪ Panel web (Flask + MJPEG): video anotado en vivo, tarjetas EPP, log de eventos│
+│  ▪ Consola + frames anotados guardados en runs/agente/alertas/                   │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Sesión en vivo (2 procesos en paralelo):**
+
+| Proceso | Puerto | Rol |
+|---|---|---|
+| `piloto.py` | 8000 | Webhook (stdlib) + túnel cloudflared + auto-registro del webhook en Meta |
+| `panel.py` | 5000 | Webcam + video MJPEG anotado en http://localhost:5000 + WhatsApp asíncrono |
+
+---
+
+## 📊 Dataset: Construction PPE
+
+Dataset oficial **Construction PPE** (Ultralytics), tarea de detección de objetos.
 
 <p align="center">
   <img src="https://img.shields.io/badge/1.416-imágenes-informational?style=flat-square" alt="imágenes">
@@ -109,27 +127,38 @@ Construido sobre el dataset oficial **Construction PPE** (Ultralytics) para la t
   <img src="https://img.shields.io/badge/11.521-bounding_boxes-informational?style=flat-square" alt="bounding boxes">
 </p>
 
-**Split oficial del dataset:**
+**Split oficial usado para entrenar** (`dataset_v2/`, generado por `eda/06_resplit_oficial.py`, seed 42 — corrige la contaminación train/val/test detectada en el EDA):
 
-| Split  | Imágenes | Uso                     |
-|--------|----------|-------------------------|
-| Train  | 1,132    | Entrenamiento con etiquetas |
-| Test   | 284      | Evaluación                  |
+| Split  | Imágenes | Etiquetado | Uso |
+|--------|---------:|:---:|---|
+| Train  | 1,130 | ✅ | Entrenamiento |
+| Valid  |   143 | ✅ | Selección de modelo |
+| Test   |   140 | ✅ | Evaluación final |
 
-> ℹ️ **Nota sobre el repositorio:** el script `image_downloader.py` realiza su **propio split 80/20** sobre los 1,416 registros: descarga **1,129 imágenes con etiquetas** (carpeta `train/`) y **284 imágenes sin etiquetas** (carpeta `test/`), de modo que las etiquetas de test pueden generarse posteriormente para evaluación.
+**Las 11 clases** (las `no_*` = incumplimiento, el objetivo del agente):
 
-**Las 11 clases (y su frecuencia en las 11,521 cajas etiquetadas):**
+| ID | Clase | Cajas | ID | Clase | Cajas |
+|----|-------|------:|----|-------|------:|
+| 0  | helmet    | 1,734 | 6  | Person    | 2,245 |
+| 1  | gloves    | 1,445 | 7  | no_helmet |   485 |
+| 2  | vest      | 1,618 | 8  | no_goggle |   411 |
+| 3  | boots     | 1,597 | 9  | no_gloves |   556 |
+| 4  | goggles   |   518 | 10 | no_boots  |   115 |
+| 5  | none      |   797 |    |           |       |
 
-| ID | Clase         | Cajas | ID | Clase     | Cajas |
-|----|---------------|-------:|----|-----------|------:|
-| 0  | helmet        | 1,734  | 6  | Person    | 2,245 |
-| 1  | gloves        | 1,445  | 7  | no_helmet | 485   |
-| 2  | vest          | 1,618  | 8  | no_goggle | 411   |
-| 3  | boots         | 1,597  | 9  | no_gloves | 556   |
-| 4  | goggles       | 518    | 10 | no_boots  | 115   |
-| 5  | none          | 797    |    |           |       |
+<details>
+<summary><strong>📉 Ver figuras del EDA</strong> (distribuciones, splits y señales de riesgo)</summary>
 
-Las clases `no_*` representan el **EPP ausente** (el caso de incumplimiento que interesa al agente), mientras que las clases restantes modelan el equipo presente sobre cada persona.
+<p align="center">
+  <img src="eda/figuras/fig1_clases.png" width="48%" alt="Distribución de clases"/>
+  <img src="eda/figuras/fig3_splits.png" width="48%" alt="Splits del dataset"/>
+  <img src="eda/figuras/fig4_areas.png" width="48%" alt="Áreas de cajas"/>
+  <img src="eda/figuras/fig5_dimensiones.png" width="48%" alt="Dimensiones de imágenes"/>
+</p>
+
+Hallazgos clave del EDA (`Documentation/EDA_SAFESITE_DATASET.md`, hallazgos F1–F10): desbalance severo de `no_*` (solo 20.3 % de train con incumplimiento), etiquetas YOLO íntegras, contaminación del split original corregida en `dataset_v2/`.
+
+</details>
 
 ---
 
@@ -137,72 +166,85 @@ Las clases `no_*` representan el **EPP ausente** (el caso de incumplimiento que 
 
 ```
 SAFESITE-AGENT/
-├── construction-ppe.ndjson         # Metadata del dataset (registros de imagen + anotaciones)
-├── image_downloader.py             # Descarga de imágenes + generación de etiquetas YOLO
-├── README.md                       # Este documento
-├── Documentation/
-│   └── Diseño_Agente_SafeSite.pdf  # Documento de diseño del agente
-└── safesite_dataset/
-    ├── train/                      # Imágenes + etiquetas .txt (formato YOLO)
-    └── test/                       # Imágenes (sin etiquetas, listas para evaluación)
+├── README.md                        # este documento
+├── AGENTS.md                        # convenciones para agentes de IA
+├── construction-ppe.ndjson          # metadatos oficiales del dataset (solo lectura)
+├── image_downloader.py              # pipeline original (OBSOLETO: URLs CDN expiradas)
+├── safesite_dataset/                # dato CRUDO (respaldo; no regenerable desde internet)
+├── dataset_v2/                      # re-split OFICIAL p/ entrenar (images/ + labels/ + dataset.yaml)
+├── eda/                             # EDA reproducible: scripts 01…06, salidas/, figuras/
+├── src/
+│   ├── entrenamiento/
+│   │   └── entrenar_baseline.py     # entrenamiento YOLOv8 (seed 42, workers=0 en Windows)
+│   └── safesite/                    # NÚCLEO DEL AGENTE
+│       ├── agente.py                # orquestador percibir → razonar → actuar
+│       ├── percepcion.py            # wrapper YOLO + umbrales por clase
+│       ├── razonamiento.py          # confirmación temporal (K frames)
+│       ├── memoria.py               # cooldown anti-spam + historial jsonl
+│       ├── actuarios.py             # consola + WhatsApp Business (Cloud API)
+│       ├── servidor_webhook.py      # webhook stdlib (perfil/INFO) para Meta
+│       ├── piloto.py                # arranque autónomo webhook+túnel cloudflared
+│       ├── panel.py                 # panel web Flask+MJPEG con webcam en vivo
+│       ├── prueba_whatsapp.py       # prueba de alertas rotativas (¡envía reales!)
+│       └── demo.py                  # simulación de video + métricas de incidente
+├── runs/                            # experimentos (gitignored; mejor: safesite/tuned_v2_s)
+└── Documentation/
+    ├── Diseño_Agente_SafeSite.pdf   # documento académico de diseño
+    ├── EDA_SAFESITE_DATASET.md      # informe EDA (F1–F10)
+    ├── ROADMAP_AGENTE.md            # roadmap Fases 0–5 (0–4 ✅)
+    ├── BITACORA.md                  # registro de TODAS las ejecuciones (E1–E29)
+    ├── WHATSAPP_LIMITES_COSTOS.md   # límites, cuotas y costos de la Cloud API
+    └── SKILLS.md                    # skills instaladas y procedencia
 ```
 
 ---
 
 ## 🚀 Quick Start
 
-Requisitos: **Python 3** y el paquete `requests`.
+Requisitos: **Python 3.11+** con el entorno `.venv` (torch + ultralytics). Credenciales de WhatsApp en `.env` (no versionado).
 
-```bash
-# 1. Instalar dependencia
-pip install requests
+```powershell
+# Demo del agente sobre el dataset (simulación de video, métricas de incidente)
+.venv\Scripts\python.exe -m src.safesite.demo
 
-# 2. Ejecutar el pipeline de preparación del dataset
-python image_downloader.py
+# Panel web EN VIVO por webcam → http://localhost:5000
+.venv\Scripts\python.exe -m src.safesite.panel --device 0
+
+# Piloto WhatsApp (webhook + túnel + auto-registro en Meta)
+.venv\Scripts\python.exe -m src.safesite.piloto
+
+# Entrenar un nuevo run (nombre obligatorio, no sobrescribe)
+.venv\Scripts\python.exe src\entrenamiento\entrenar_baseline.py --name mi_run
 ```
 
-El script `image_downloader.py` realiza las siguientes tareas:
-1. Lee los registros de imagen del archivo `construction-ppe.ndjson`.
-2. Mezcla y particiona los datos en **80% train / 20% test** (semilla `42` para reproducibilidad).
-3. **Descarga imágenes** desde las URL del CDN de Ultralytics.
-4. **Genera etiquetas YOLO** (`.txt`) para cada imagen de `train/` a partir de las anotaciones del NDJSON; las imágenes de `test/` se descargan **sin etiquetas**, para poder evaluarlas posteriormente.
+> 🎥 **Sesión en vivo completa:** `piloto.py` (puerto 8000) y `panel.py` (puerto 5000) en paralelo → alertas con foto por WhatsApp + respuesta **INFO** conversacional mientras el video sigue fluyendo.
 
 ---
 
-## 🏷️ Formato de etiquetas YOLO
+## 🗓️ Roadmap
 
-Cada imagen de entrenamiento tiene asociado un archivo `.txt` del mismo nombre, donde **cada línea** representa un objeto en el formato:
+| Fase | Objetivo | Estado |
+|---|---|---|
+| 0 | Corregir datos (re-split oficial `dataset_v2`) | ✅ |
+| 1 | Baseline YOLO entrenado (`baseline_v1`) | ✅ |
+| 2 | Tuning anti-desbalance → gana **YOLOv8s** (`tuned_v2_s`) | ✅ |
+| 3 | Núcleo del agente (percepción → razonamiento → memoria) | ✅ |
+| 4 | Actuadores: WhatsApp bidireccional + panel web en vivo | ✅ |
+| 5 | Mejora continua (calibrar umbral, human-in-the-loop, dominio fijo) | 🔄 |
 
-```
-<class_id> <x_center> <y_center> <width> <height>
-```
-
-> Las coordenadas están **normalizadas** (valores entre 0 y 1) respecto al ancho y alto de la imagen.
-
-Ejemplo real (`00820783fe0983a4dc3f2435e928a038.txt`):
-
-```text
-0 0.361090 0.359030 0.230440 0.158430      # helmet
-2 0.364160 0.679010 0.380640 0.230440      # vest
-6 0.374730 0.521860 0.488850 0.562920      # Person
-```
+Detalle completo: `Documentation/ROADMAP_AGENTE.md` · historial de ejecuciones: `Documentation/BITACORA.md` (E1–E29).
 
 ---
 
-## 🗓️ Estado del proyecto y roadmap
+## 📚 Documentación
 
-**⚠️ Fase actual — diseño y preparación de datos:**
-- ✅ Documento de diseño del agente (`Documentation/`).
-- ✅ Pipeline de descarga y etiquetado del dataset en formato YOLO.
-- ✅ Dataset de entrenamiento (train) descargado y etiquetado.
-
-**🔜 Siguientes fases (desarrollo):**
-- ⬜ Entrenamiento y tuning del modelo de detección (YOLO).
-- ⬜ Integración del flujo de video en tiempo real.
-- ⬜ Reglas de decisión + memoria (historial por zona/horario).
-- ⬜ Bot announcer de WhatsApp Business.
-- ⬜ Panel de supervisión con bounding boxes en vivo.
-- ⬜ Reentrenamiento con falsos positivos/negativos reportados por supervisores.
+| Documento | Contenido |
+|---|---|
+| `Documentation/EDA_SAFESITE_DATASET.md` | EDA completo: integridad, desbalance, contaminación de splits |
+| `Documentation/ROADMAP_AGENTE.md` | Plan de ejecución del agente y criterios pre-registrados |
+| `Documentation/BITACORA.md` | Registro bitácora de experimentos y ejecuciones (fecha, comando, seed, resultados) |
+| `Documentation/WHATSAPP_LIMITES_COSTOS.md` | Límites/costos de WhatsApp Business Cloud API (prueba vs producción) |
+| `Documentation/Diseño_Agente_SafeSite.pdf` | Documento académico de diseño del agente |
 
 ---
 
@@ -217,16 +259,16 @@ Ejemplo real (`00820783fe0983a4dc3f2435e928a038.txt`):
 | **Presentado por** | William David Lozano Julio — T00078475 |
 | **Curso** | Inteligencia Artificial |
 | **Docente** | Edwin Alexander Puertas Del Castillo |
-| **Fecha** | 28/08/2026 |
+| **Fecha** | 28/08/2026 → última fase completada 13/10/2026 |
 
 **Referencias:**
 - Russell, S. J., & Norvig, P. *Artificial Intelligence: A Modern Approach*.
-- IBM — *Components of AI agents*.
-- Ultralytics — *Construction-PPE Dataset*.
+- Ultralytics — *Construction-PPE Dataset* · *YOLOv8*.
+- Meta — *WhatsApp Business Cloud API*.
 - *PPE detector: a YOLO-based architecture...* (PMC).
 
 ---
 
 <sub>
-**Nota de transparencia:** este README fue redactado con la ayuda de agentes de inteligencia artificial — específicamente **Big Pickle** (modelo `opencode/big-pickle`, ejecutado en la herramienta de asistencia OpenCode) y **Anthropic Claude** — que analizaron el dataset, el código y el documento de diseño del proyecto para generar la documentación. El contenido refleja fielmente los archivos existentes en el repositorio y los datos reales del dataset, sin elementos inventados.
+**Nota de transparencia:** la documentación de este repositorio se redactó con ayuda de agentes de inteligencia artificial (OpenCode / modelos de lenguaje), que analizaron el dataset, el código, la bitácora y el documento de diseño. Todo el contenido refleja fielmente los archivos del repositorio y los datos reales medidos en los experimentos, sin elementos inventados.
 </sub>
