@@ -421,7 +421,7 @@ Recall A NIVEL DE INCIDENTE (¿alertó el agente la clase correcta en la escena?
 **Configuración de credenciales (Meta Business Cloud API):**
 - App `safesite-agent` creada por el usuario en developers.facebook.com (tipo Business, producto WhatsApp)
 - **Token permanente** de System User (~199 chars) — el usuario lo configuró directamente en las variables de entorno de Windows (`setx`) y **nunca pasó por el chat ni por git** (lección aplicada tras exponer el temporal: auto-expira, no se repitió el patrón)
-- Credenciales centralizadas en **`.env`** (gitignored, verificado con `git check-ignore`): `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_DESTINATARIO=573185469893` (número personal del usuario — hará de supervisor HSE en el piloto)
+- Credenciales centralizadas en **`.env`** (gitignored, verificado con `git check-ignore`): `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_DESTINATARIO=***9893` (número personal del usuario, enmascarado aquí tras la depuración E39 — hace de supervisor HSE en el piloto)
 - Mini-loader de `.env` en `src/safesite/__init__.py` (sin dependencias; `os.environ.setdefault` — el entorno real tiene prioridad). **Bug documentado:** PowerShell `Set-Content -Encoding utf8` escribe BOM (`EF BB BF`, verificado en bytes) que contaminaba la primera clave → corregido leyendo con `utf-8-sig`
 
 **Verificaciones previas:**
@@ -533,6 +533,227 @@ Tras el reinicio del servidor de OpenCode (los procesos `piloto.py`/`panel.py` m
 | **Bitácora (estructura)** | P9 marcado ✅ (decía "próxima" con la Fase 4 ya completa); entrada E24 reubicada en orden cronológico (había quedado tras E28 por orden de escritura); tabla resumen del EDA actualizada con los hallazgos ya resueltos; añadidos P10–P13 como pendientes de aprobación. |
 
 **Estado de git al cierre:** `origin` = github.com/WilliamLzn/SAFESITE-AGENT con `origin/main` = `1798a95` (solo el commit base con el dataset crudo). Los 9 commits con TODO el trabajo (EDA, Fases 0–4, bitácora E1–E28) existen **solo en el disco local** → **P13 (push a GitHub) es la prioridad de respaldo**, pendiente de aprobación del usuario.
+
+---
+
+### E30 — Anclaje visual de EPP a nivel de ojos + robustez del agente (14-oct) 👁️
+
+**Motivación (observación del usuario en la sesión en vivo):** las cajas de `goggles` se dibujaban "a nivel de la boca". Verificación empírica sobre el split oficial (cajas contenidas ≥30% en su caja `Person`):
+
+| Clase | n | Posición mediana del centro (fracción de la altura de la persona) | Referencia anatómica |
+|---|---|---|---|
+| `helmet` | 1,577 | 11.1% | ✅ correcta (cabeza ≈ 0–13%) |
+| `goggles` | 509 | **14.5%** (p25–p75: 13–18%) | ❌ barbilla/cuello; ojos humanos ≈ 8% |
+| `no_goggle` | 405 | **17.7%** | ❌ aún más bajo |
+
+**Diagnóstico:** sesgo **heredado del dataset fuente** (MOCS/Ultralytics construction-ppe: cajas de "goggles" que cubren zona gafas+tapabocas o gafas colgadas al cuello). El modelo predice donde le enseñaron (verificado: predicciones ≈ posiciones del GT en test); no era un bug del código de dibujo.
+
+**Fix (cosmético, de presentación — no toca detecciones ni métricas):** `percepcion.anotar()` re-ancla las cajas de `goggles`/`no_goggle` a nivel de ojos de la persona que las contiene: objetivo = centro de la cabeza − 15% de su altura (calibrado con el propio GT: mediana resultante 8.8–9.0% ≈ ojos; usa casco/no_helmet si existe, si no el 8% de la altura de la persona). Solo desplaza hacia arriba. Además: etiquetas en español con fondo sólido (legibilidad), personas con caja gruesa celeste, y validación antes/después en `runs/agente/validacion_anclaje/` (gafas: 20.6%→10.2%, 14.3%→8.4%, 21.0%→12.2% de la altura de la persona).
+
+**Robustez añadida (requisito de la entrega: "sensor sin dato"):** `agente.procesar_frame` ahora valida el frame antes de inferir (None / ndim<3 / size==0 → `frames_fallidos++`, registra, no actúa, no lanza). Hallazgo intermedio: ultralytics con `frame=None` **no falla** — silenciosamente procesa su imagen de ejemplo (warning "source is missing"); por eso la validación es explícita. Un frame fallido no rompe la racha de confirmación (decisión documentada: tolerancia a fallos transitorios del sensor).
+
+**Archivos:** `src/safesite/percepcion.py` (anotar + 4 helpers), `src/safesite/config.py` (NOMBRES_ES, CLASES_OJOS, FRACCION_OJOS), `src/safesite/agente.py` (guardia de frame inválido + `reset()`).
+
+---
+
+### E31 — Suite de pruebas de la Fase 3 (enunciado de entrega): 4 medidas CUMPLE ✅ (14-oct)
+
+**Comando:** `.venv\Scripts\python.exe -X utf8 -m src.safesite.pruebas_medidas --device 0` · 2 corridas (la primera con bug de reporte en S12: contaba sobre el actuador equivocado; corregido y re-ejecutada completa) · seed 42 · K=3 · cooldown 30 s · 5 repeticiones por escenario.
+
+**Diseño:** medidas M1–M4 con **umbral pre-registrado antes de ejecutar**; Parte A = splits completos val/test (54 escenas incidente + 229 control × 5 reps); Parte B = 13 escenarios S1–S13 (4 normales, 5 límite, 4 de falla esperada) × 5 reps con `agente.reset()` entre repeticiones; log de ejecución por frame con marca de tiempo.
+
+**Resultados (todos CUMPLE):**
+
+| Medida | Umbral (pre-registrado) | Resultado |
+|---|---|---|
+| M1 Recall de incidente | ≥ 0.70 | **0.964 ± 0.000 val** / **0.962 ± 0.000 test** |
+| M2 Falsas alarmas (control) | ≤ 0.10 | **0.035 val** / **0.026 test** |
+| M3 Tiempo de notificación | < 10 s | **2.99 s** end-to-end (1.0 s de confirmación K=3 a 2 FPS + 3×~32 ms de inferencia + 1.9 s de envío HTTP medido en E24; en vivo E28: ~2.6 s) |
+| M4 Cooldown anti-spam | 0 duplicadas | S6: reincidencia dentro de la ventana → **1 alerta** (bloqueada la 2ª); S7: tras cooldown → **2 alertas** permitidas |
+
+**Casos de falla esperada (todos con el comportamiento diseñado, 0 excepciones):** S10 frame `None` y S11 frame de 1 canal → registrados como `frames_fallidos`, el agente continúa; S12 WhatsApp Cloud API caída (mock que lanza ConnectionError) → degrada imagen→texto→historial: **la alerta queda persistida** (1 en `historial_incidentes.jsonl`) y no se propaga la excepción; S13 checkpoint inexistente → fallo de arranque controlado (`FileNotFoundError`, sin traceback al usuario final); S9 frame negro → sin detecciones ni error.
+
+**Caso límite honesto:** S5 (persona lejana — la de menor caja del test) → **sin alerta** (0/5 reps). Causa probable: objeto pequeño (consistente con el EDA: área mediana 1.85% de la imagen; imgsz ya en 640). Propuesta de mejora: imgsz ≥ 960 en inferencia o recortes con re-escala, y reentrenar (documentado como trabajo futuro, no aplicado para no arriesgar las métricas validadas antes de la entrega).
+
+**Artefactos de evidencia:** `runs/agente/pruebas/` → `log_ejecucion.jsonl` (percepción/decisión/acción por frame con marca de tiempo), `resultados_20261014_170459.csv`, `resultados_20261014_170459.json`, `tabla_resultados_20261014_170459.md` (tabla lista para el documento). Nota: la primera corrida (20261014_165621) queda también en disco como evidencia del proceso; la válida para la entrega es la segunda.
+
+**Documentos de la entrega generados en esta sesión:** `Documentation/MATRIZ_DECISION.md` (Fase 1: SAFESITE 4.85 vs PredictMaint 2.90 + sensibilidad), `Documentation/TABLA_CAMBIOS.md`, `Documentation/DESARROLLO_AGENTE.md` (sección 9 con UML Mermaid), `Documentation/ANALISIS_PRUEBAS.md`, `Documentation/GUION_VIDEO.md`, `Documentation/BITACORA_USO_IA.md`, `requirements.txt`, `.env.example`.
+
+---
+
+### E32 — Anti-spam del canal WhatsApp + pausa y envío manual desde el panel (14-oct) 🔕
+
+**Motivación (observación del usuario):** en la sesión en vivo, las confirmaciones de varias clases `no_*` en momentos distintos (o reincidencias por flickering de detección) generaban mensajes seguidos: el cooldown existente era **por (zona, clase)**, sin límite global del canal.
+
+**Cambios:**
+
+| Mecanismo | Detalle |
+|---|---|
+| **Cooldown global del canal** | `config.COOLDOWN_GLOBAL_S = 60 s`: tiempo mínimo entre CUALQUIER par de mensajes de WhatsApp (independiente de zona/clase). Implementado en `ActuadorWhatsApp._permite_envio()`. |
+| **Tope por hora rodante** | `config.MAX_MENSAJES_HORA = 20`: ventana de 3600 s; superado el tope, las alertas se suprimen con log claro (`🔕 ... suprimido (motivo)`). |
+| **`forzar=True` (envíos explícitos)** | Bypass deliberado de ambos límites para peticiones del supervisor: botón "Enviar alerta ahora" del panel y `prueba_whatsapp.py` (que ahora usa `ActuadorWhatsAppForzado`). Los envíos forzados CONSUMEN las cuotas. |
+| **Pausa desde el panel** | Botón "⏸️ Pausar WhatsApp" ↔ "▶️ Reanudar" (`POST /whatsapp/toggle`): `ActuadorWhatsAppAsync.activo=False` → los incidentes siguen confirmándose y registrándose en el panel y el historial, pero NO llegan al teléfono. |
+| **Envío manual desde el panel** | Botón "📨 Enviar alerta ahora" (`POST /alerta/manual`): envía el estado ACTUAL de la zona (lote con las faltas del último frame + foto anotada, deduplicadas por clase). Sin faltas → mensaje de estado "zona sin incumplimientos". Bypassa pausa y límites (petición explícita). |
+| **Badge de faltas actuales** | `/estado` ahora reporta `faltas_actuales` y `whatsapp_activo/whatsapp_modo`; la página los muestra (badge rojo bajo los botones). |
+
+**Decisiones de diseño:** (1) los límites viven SOLO en el actuador WhatsApp — consola, panel e historial no se limitan (la evidencia interna nunca se pierde); (2) solo un envío EXITOSO consume las cuotas (un envío fallido no suprime los siguientes); (3) las alertas suprimidas NO se reintentan (llegarían desfasadas); (4) `prueba_whatsapp.py` y el botón manual quedan fuera de los límites por ser peticiones deliberadas.
+
+**Validación (DRY-RUN garantizado con envs inexistentes):** mensaje 1 → enviado; mensaje 2 inmediato → suprimido por cooldown global; manual (forzar) → enviado; tope por hora → suprimido; forzar → enviado. Pausa: el actuador async no encola; reanudar → encola. Endpoints Flask verificados con test_client (`/`, `/estado`, `/whatsapp/toggle` ×2, `/alerta/manual`) — todos 200. **Incidente de la prueba:** la primera corrida de validación se hizo con variables de entorno vacías, que en PowerShell ELIMINAN la variable (el cargador de `.env` la re-pobla) → modo ENVIO-REAL accidental: se enviaron **3 mensajes de prueba reales** al destinatario configurado (contenido idéntico al de `prueba_whatsapp.py`, sin consecuencias). Lección: para forzar DRY-RUN usar nombres de env inexistentes (`token_env='NOPE'`), nunca variables vacías.
+
+**Impacto en métricas:** NINGUNO — la suite de pruebas (E31) usa `ActuadorRegistro` (canal interno, sin límites) y el cooldown por (zona, clase) de M4 no cambió. Los límites globales aplican solo al canal externo.
+
+**Archivos:** `src/safesite/config.py` (COOLDOWN_GLOBAL_S, MAX_MENSAJES_HORA), `src/safesite/actuarios.py` (limitador + `forzar`), `src/safesite/panel.py` (pausa, envío manual, endpoints, UI), `src/safesite/prueba_whatsapp.py` (forzado).
+
+---
+
+### E33 — Calibración de umbrales por clase: perfil VIVO para sesiones reales (14-oct) 🎚️
+
+**Motivación (evidencia del usuario en la sesión en vivo):** con gafas y guante puestos, el panel reportaba `SIN GAFAS` (conf 0.16) y `SIN GUANTES` (conf 0.29) — falsos positivos que disparaban alertas (junto a `SIN CASCO` 0.38, correcta). Causa raíz: cambio de dominio (dataset MOCS = obra a distancia con EPP industrial; webcam = primer plano de oficina con gafas de prescripción y guante de goma) + umbral global de `no_*` bajo a propósito (0.15, EDA F5).
+
+**Verificación antes de decidir (distribuciones de confianza val+test, conf de inferencia ≥0.05):**
+
+| Clase | Verdaderas (mediana / p25) | Falsas en control (mediana / p90) |
+|---|---|---|
+| `no_helmet` | 0.33 / 0.22 | 0.09 / 0.46 |
+| `no_goggle` | **0.16** / 0.11 | 0.11 / 0.12 |
+| `no_gloves` | 0.26 / 0.16 | 0.08 / 0.24 |
+| `no_boots` | 0.14 / 0.08 | 0.15 / 0.26 |
+
+**Hallazgo clave:** los falsos positivos en vivo (0.16–0.29) se solapan con el rango de las detecciones verdaderas del dataset (`no_goggle` mediana 0.16). **Un umbral global alto rompería el recall validado de la suite (E31, cumplido con 0.15).** Solución: **dos perfiles** documentados:
+
+| Perfil | Dónde corre | Umbrales `no_*` |
+|---|---|---|
+| `evaluacion` (default suite/demo) | `pruebas_medidas.py`, `demo.py` | global 0.15 — **intacto, métricas E31 válidas sin re-correr** |
+| `vivo` (default panel) | `panel.py` | por clase: `no_helmet` 0.18 · `no_goggle` 0.32 · `no_gloves` 0.32 · `no_boots` 0.15 |
+
+Justificación por clase: `no_helmet` 0.18 conserva las verdaderas más débiles del piloto (E28: ~18%); `no_goggle`/`no_gloves` 0.32 cortan los FP observados (0.16/0.29) con margen; `no_boots` sin cambio (sus verdaderas, mediana 0.14, ya no pasaban el umbral global de evaluación; clase irrelevante en webcam). **Tradeoff documentado:** en perfil vivo, manos desnudas o ausencia de gafas con confianza < 0.32 no alertarían (se prioriza no molestar al supervisor con falsas alarmas del dominio webcam; el recall del dataset queda demostrado por la suite).
+
+**Implementación:** `config.UMBRALES_INCUMPLIMIENTO_VIVO`; `Razonamiento` acepta el mapa por clase (`filtrar_por_clase` por instancia); `SafeSiteAgent(perfil_umbrales=...)` conservado en `reset()`; `panel.py --perfil {vivo,evaluacion}` (default vivo) + perfil visible en `/estado` y en el subtítulo de la página.
+
+**Validación:** (1) casos límite sintéticos con las confianzas reales observadas — FP gafas 0.16 y guantes 0.29 se cortan en VIVO y pasan en evaluación; TP casco 0.38 y 0.18 pasan en ambos; clases positivas idénticas. (2) Smoke: agente con perfil VIVO end-to-end + conservación del perfil tras `reset()` + panel con ambos perfiles. Pendiente: **validación en vivo del usuario** (gafas/guante puestos → sin alertas; sin casco → alerta).
+
+---
+
+### E34 — Anclaje de gafas consciente del régimen de imagen (full-body vs primer plano) 👁️ (14-oct)
+
+**Motivación (captura en vivo del usuario, perfil VIVO ya activo):** con casco real puesto, `Casco 0.85` detectado ✅ y sin `SIN CASCO` falsas ✅ — pero una alucinación del modelo (`goggles` 0.39 **encima del casco**, sobre la zona oscura del visor) era izada al montarla con la fórmula E30 ("centro de la caja del casco − 15%"), que asume el régimen de las fotos de obra (caja del casco inflada: cubre cabeza+rostro). En primer plano de webcam esa caja es ajustada y los ojos caen **bajo el borde del casco**, no dentro de ella.
+
+**Fix en `_reanclar_a_ojos`:** detección de régimen por la fracción de la persona donde termina la caja del casco (`(y2_casco − py1)/ph` ≤ 0.25 → full-body/etiquetas infladas: centro de la caja del casco − 15%[sin cambio]; > 0.25 → primer plano: **borde inferior del casco + 20% de la altura de la caja de gafas**). Cabeza descubierta (`no_helmet`): ojos a la mitad superior de la cabeza (×0.5). Clamp anatómico ampliado a [3 %, 45 %] de la persona (ojos en full-body ≈ 8 %; en encuadre cabeza+torso ≈ 38-40 %). Zona muerta añadida: no mover cajas ya a nivel de ojos (≤ 25 % de su altura por encima del objetivo).
+
+**Extra de legibilidad:** la clase **`none` (id 5) ya no se dibuja** — no es clase de incumplimiento, no informa al supervisor y en vivo aparecía como caja ruidosa cubriendo el torso (ej. "None 0.55" en la captura del usuario). Seguirá existiendo en el conteo de rutas internas si se requiere; un revert de una línea la restaura.
+
+**Validación (sintético con geometría real del piloto + regresión dataset):**
+- gafas FP alucinadas sobre el casco: NO se mueven (quedan donde el modelo las puso — honestidad visual: el FP es del modelo, no del dibujo)
+- gafas reales a nivel de ojos: NO se mueven (zona muerta)
+- `no_goggle` bajo sin casco: sube al nivel de ojos (~centro-cabeza ×0.5 → 260 px en la geometría real de la captura)
+- dataset full-body (test): 20.6 %→10.2 %, 14.3 %→8.4 %, 21.0 %→12.2 % — **sin regresión** respecto a E30
+- evidencia `runs/agente/validacion_anclaje/despues_*.jpg` regenerada
+
+**Archivos:** `src/safesite/percepcion.py` (`_reanclar_a_ojos` con régimen; skip de `none`).
+
+---
+
+### E35 — Regla de coherencia por persona + recalibración de umbrales VIVO (14-oct) 🧠
+
+**Motivación (segunda ronda de pruebas en vivo del usuario):** (a) gafas: el modelo falla en AMBAS direcciones en webcam (a veces no ve las gafas puestas, a veces no dispara `no_goggle` sin ellas — clase AP50 0.10, la más débil); (b) guantes: el positivo suele detectar UNA sola mano y la no detectada generaba `no_gloves` (FP) aunque ambas llevaban guante; (c) el casco funciona bien.
+
+**Dos cambios (solo perfil VIVO — la suite E31 en perfil evaluación queda intacta):**
+
+1. **Recalibración de umbrales con los datos del piloto:** `no_goggle` 0.32→**0.18** (TP real sin gafas ~0.20 en E28; FP con gafas ~0.16 — el par se separa por 0.04, la K=3 temporal y el anti-spam amortiguan la varianza) y `no_gloves` 0.32→**0.25** (TP manos desnudas ~0.27; el FP 0.29 lo suprime la regla de coherencia, no el umbral).
+2. **Regla de coherencia por persona** (`config.REGLA_COHERENCIA_VIVO = {helmet→no_helmet, goggles→no_goggle, gloves→no_gloves}`, en `razonamiento.filtrar_por_clase`): si el positivo de un EPP está detectado (≥0.35) en la MISMA persona, el `no_*` contradictorio se suprime con log `🧠 coherencia`. Resuelve: casco puesto + no_helmet residual; un guante visto + no_gloves de la otra mano; gafas vistas + no_goggle residual. **Tradeoff documentado:** una persona genuinamente con una sola mano descubierta no alertaría en vivo (se prioriza no molestar en el piloto webcam; en obra la regla puede desactivarse corriendo `--perfil evaluacion`).
+
+**Validación (sintética con las geometrías del piloto):** T1 casco 0.85 + no_helmet 0.19 misma persona → suprimido en VIVO, **se mantiene en EVALUACIÓN** (suite intacta); T2 un guante 0.50 + no_gloves 0.27 → suprimido; T3 dos personas (una guanteada, otra desnuda) → la desnuda SÍ alerta (supresión por persona, no global); T4 goggles 0.39 + no_goggle 0.25 → suprimido; T5 límites: no_goggle 0.20 pasa / 0.16 corta, no_gloves 0.27 pasa / 0.20 corta; T6 manos realmente desnudas sin positivo → alerta normal. Smoke end-to-end del agente con perfil+coherencia, conservados tras `reset()`.
+
+**Pendiente honesto:** la clase `goggles`/`no_goggle` sigue siendo estructuralmente débil en webcam (positivo poco fiable también). Si el FP de gafas persiste en vivo, la solución de raíz es el fine-tune con frames del dominio (pendiente de decisión del usuario).
+
+**Archivos:** `src/safesite/config.py` (umbrales VIVO recalibrados + REGLA_COHERENCIA_VIVO), `src/safesite/razonamiento.py` (regla por persona + contador `suprimidas_coherencia`), `src/safesite/agente.py` (param `coherencia`, conservado en reset), `src/safesite/panel.py` (activa la regla con perfil vivo).
+
+---
+
+### E36 — BANCO DE PRUEBAS EN VIVO: captura + evaluación por clase en webcam 🎬 (16-oct)
+
+**Motivación (tercera ronda de pruebas del usuario):** reporta que el agente "aún falla bastante" con **gafas** y **chaleco**. Diagnóstico con los datos existentes (antes de nuevas pruebas):
+
+- **Gafas** (`no_goggle`): AP50 0.10 val / 0.21 test y **recall de incidente 0.44 val / 0.54 test** (E23) — el eslabón más débil de los cuatro `no_*`, agravado por el cambio de dominio webcam (E35: falla en AMBAS direcciones; TP ~0.20 vs FP ~0.16).
+- **Chaleco — hallazgo estructural:** el dataset **NO tiene clase `no_vest`** → el agente no puede alertar "SIN CHALECO" por diseño (el usuario esperaba exactamente esa alerta). La clase positiva `vest` es fuerte en MOCS (AP50 0.87 test) pero está sin validar en webcam.
+- Smoke incidental honesto: en la imagen de test `05f321d9…` (GT con `no_helmet`) el modelo de despliegue **ni siquiera produce la detección** cruda → el 16.7% de fallas de incidente en test (E23) es real, no un artefacto de medición.
+
+**Construcción (pipeline idéntico al agente, SIN actuadores — el banco nunca envía WhatsApp):**
+
+1. **`src/safesite/capturar_banco.py`** — captura de webcam POR ESCENARIO con vista anotada en vivo (perfil VIVO, mismo formato que el panel). Teclas `1-7` escenario · `ESPACIO` ráfaga · `ESC` salir. Guarda frames CRUDOS (calidad 95, 1280×720) en `runs/agente/banco_vivo/capturas/<escenario>/` + `manifiesto.json`. **Los mismos frames son el insumo del fine-tune** (doble uso: medir y entrenar).
+2. **`src/safesite/banco_vivo.py`** — evaluación por clase sobre las capturas, en AMBOS perfiles (evaluación y vivo): réplica exacta percepción → `filtrar_por_clase` → rachas K=3 (`Razonamiento` puro, sin memoria/actuadores). Reporta por escenario: tasa de detección cruda + distribución de confianzas (mediana/p25/p75) por clase, positivos esperados (≥0.35), incidentes confirmados, **alertas faltantes (no avisó)** e **inesperadas (FP)**. Salidas `eda/salidas/banco_vivo_<fecha>.json` + `.md`.
+
+7 escenarios pre-registrados con expectativas (`ESCENARIOS_BANCO`, compartido por ambas herramientas): `con_todo`, `sin_casco`, `sin_gafas`, `sin_chaleco` (nota: hoy no alertable), `sin_guantes`, `sin_epp`, `vacio` (control de falsas alarmas).
+
+**Validación (smoke en GPU):** 6 copias de `05f321d9…` en `runs/agente/banco_vivo/smoke/sin_casco/` → banco end-to-end OK en ambos perfiles (reporte completo, confirmación de `no_boots` = FP crónico de la clase más débil AP50 0.02, latencia 25 ms/frame tras calentar). Ambas herramientas reconfiguran stdout a UTF-8 (consolas cp1252 no imprimen emojis).
+
+**Plan pre-registrado (E37+):** (1) usuario captura ~40 frames/escenario con poses variadas; (2) banco → diagnóstico cuantitativo del dominio webcam (convierte la sensación "falla bastante" en números por clase); (3) decidir el chaleco con esos datos: clase 12 `no_vest` en el fine-tune vs regla de inferencia persona-sin-vest; (4) etiquetado manual de los frames (11 clases + posible `no_vest`); (5) fine-tune desde `tuned_v2_s`, dataset mezclado (MOCS v3 + webcam, workers=0, seed 42); (6) re-banco antes/después como criterio de mejora. La suite E31 en perfil evaluación queda intacta.
+
+**Comandos:**
+```powershell
+.venv\Scripts\python.exe -m src.safesite.capturar_banco --device 0   # capturar (1-7/ESPACIO/ESC)
+.venv\Scripts\python.exe -m src.safesite.banco_vivo --device 0       # evaluar ambos perfiles
+```
+
+**Archivos:** nuevos `src/safesite/capturar_banco.py`, `src/safesite/banco_vivo.py`. Sin cambios en el núcleo del agente.
+
+---
+
+### E37 — WhatsApp BLOQUEADO por Meta (code 200 "API access blocked") + escena de verificación EPP 🚫 (16-oct)
+
+**Motivación (petición del usuario):** enviar una alerta real de WhatsApp con una foto que tenga casco+chaleco+guantes para comprobar la detección de positivos.
+
+**Hallazgo del escaneo (val+test, 283 imgs, modelo de despliegue):** solo en **1 imagen** el modelo detecta simultáneamente helmet+gloves+vest (≥0.35) y además alguna `no_*` (≥0.15): `test/7e05019e…` (helmet 0.87, vest 0.84, gloves 0.54, no_boots 0.18; GT = casco+chaleco+guantes+Person). **Más evidencia de que los positivos (en especial guantes) se resienten en fotos de obra** — alimenta la motivación del banco E36.
+
+**Ejecución:** nueva opción `--rutas` en `prueba_whatsapp.py` (procesar imágenes concretas en vez de la rotación; GT desde `dataset_v2/labels`). El agente confirmó `no_boots (18%)` en K=3 y generó la evidencia anotada (`runs/agente/alertas/prueba_7e05019e…_lote_*.jpg`, con cajas verdes de Casco/Chaleco/Guantes + roja SIN BOTAS).
+
+**Fallo del canal (nuevo, externo):** WhatsApp Cloud API rechazó AMBOS envíos (imagen y texto) con **400**. Diagnóstico directo a la API: `{"error": {"message": "API access blocked.", "code": 200, "type": "OAuthException"}}` — **Meta bloqueó el acceso a la API de la app** (no es destinatario ni ventana de 24h; funcionaba el 14-oct en E24–E26). El resumen `resumen_fase4_whatsapp.json` quedó con la ejecución.
+
+**Fix defensivo:** `ActuadorWhatsApp._post` ahora incluye el cuerpo del error de Meta en la excepción (`"400 Bad Request — Meta: {json}"`) — antes un 400 era opaco ("Client Error: Bad Request for url…" sin causa).
+
+**Pendiente del usuario (desbloqueo en el panel de Meta):**
+1. developers.facebook.com → la app → completar **Data Protection Questions** (causa nº1 de code 200 en apps WhatsApp en modo desarrollo) y revisar banners de advertencia/revisión.
+2. Verificar el negocio en **Meta Business Suite** si el panel lo pide (Business verification).
+3. Comprobar el token del System User (permisos `whatsapp_business_messaging` + `whatsapp_business_management`, sin expiración) y regenerarlo si hace falta (actualizar `.env`).
+4. Reenviar la prueba: `.venv\Scripts\python.exe -m src.safesite.prueba_whatsapp --device 0 --rutas dataset_v2\images\test\7e05019e848407b6e51380cc9bf48626.jpg`
+
+**Archivos:** `src/safesite/prueba_whatsapp.py` (opción `--rutas`), `src/safesite/actuarios.py` (`_post` con cuerpo del error).
+
+---
+
+### E38 — CIERRE del incidente WhatsApp: era la VENTANA DE 24h (error 131047) ✅ (16-oct)
+
+**Continuación de E37.** Tras el desbloqueo de la app por el usuario, la API volvió a aceptar envíos (200 + wamid) pero **el mensaje seguía sin llegar**. Diagnóstico en dos pasos:
+
+1. **Logging de `statuses` en el webhook** (`servidor_webhook.py`): Meta entrega los estados de NUESTROS envíos (sent/delivered/failed + códigos de error) solo por webhook — sin esto, un envío aceptado-pero-fallado era invisible (la API no permite consultar el estado por GET: error 100).
+2. **Piloto en vivo** (túnel + auto-registro, E26): el webhook capturó el estado real: `failed — errores: 131047 Re-engagement message`.
+
+**Causa raíz:** la **ventana de servicio al cliente de 24 h** de WhatsApp Business — solo se permiten mensajes libres (texto/imagen) durante las 24 h siguientes al ÚLTIMO mensaje del supervisor hacia el número. El piloto del 14-oct dejó la ventana abierta; el 16-oct estaba cerrada → Meta acepta el envío (wamid) y lo falla asincrónicamente con 131047. El "API access blocked" (E37) fue un incidente independiente (ya resuelto por el usuario).
+
+**Solución aplicada (verificada):** el supervisor envía `hola` al número de prueba (+1 555-667-8447) → ventana abierta → el bot auto-respondió (`sent → delivered → read`) y la **alerta con la foto EPP se entregó y fue leída** (`sent → read` en el webhook). Foto: `test/7e05019e…` con cajas verdes Casco 0.87 / Chaleco 0.84 / Guantes 0.54 y alerta `no_boots (18%)` — la comprobación de positivos que pedía el usuario.
+
+**Regla operativa permanente (lección):** cada vez que pasen >24 h sin actividad del supervisor, hay que **iniciar la conversación desde el teléfono del supervisor** (un `hola` basta) para que las alertas libres entreguen. En producción (número de negocio real), el camino correcto fuera de ventana es la plantilla aprobada `alerta_epp` (`construir_payload`, ya implementado).
+
+**Archivos:** `src/safesite/servidor_webhook.py` (log de `statuses` con códigos de error). Log completo del diagnóstico: `runs/agente/piloto_diag.log`.
+
+---
+
+### E39 — DEPURACIÓN del repositorio: commit+push de todo E30–E38 y limpieza de artefactos 🧹 (16-oct)
+
+**Motivación (petición del usuario):** "depurar el repositorio, quitar las cosas que no sean necesarias".
+
+**Hallazgo previo (el pendiente más grave no era espacio sino git):** **32 entradas sin commitear** — todo el trabajo E30–E38 (anclaje visual, suite de pruebas, anti-spam, perfiles VIVO, banco en vivo, fix WhatsApp) y los entregables del curso del 14-oct (DESARROLLO_AGENTE, MATRIZ_DECISION, TABLA_CAMBIOS, GUION_VIDEO, ANALISIS_PRUEBAS, BITACORA_USO_IA, ENUNCIADO, requirements.txt, .env.example, pruebas_fase3/). **Se commitó y se push a origin** (github.com/WilliamLzn/SAFESITE-AGENT) — pendiente más antiguo del roadmap, cerrado.
+
+**Borrados (aprobados por el usuario, ~201 MB + scratch):**
+- `runs/agente/alertas/` vaciada: **161 MB, 753 fotos de alerta transitorias** de todas las pruebas desde E24 (la evidencia selectiva documentada vive en `validacion_anclaje/` y `pruebas/`; la carpeta se conserva — el actuador la recrea con `makedirs`).
+- `last.pt` × 3 runs (**34 MB**): solo `best.pt` está referenciado por `config.RUTA_MODELO`; los entrenamientos están cerrados.
+- `weights/yolo26n.pt` (**5.3 MB**, huérfano: ningún archivo lo referenciaba) + `runs/agente/banco_vivo/smoke/` (1 MB, validación puntual de E36) + `__pycache__` de src/ y eda/.
+- Scratch de extracción en Documentation: `extract_diseno_safesite.txt`, `extract_ia_companero.txt`, `IA (1).pdf` (~117 KB) — texto ya sintetizado en los entregables (MATRIZ_DECISION); sin referencias.
+- `runs/detect/` (6 carpetas VACÍAS de validaciones viejas de ultralytics).
+
+**Higiene de seguridad previa al push:** número personal del supervisor enmascarado en la entrada E24 (`***9893`); verificado que `.env` está ignorado, `.env.example` solo tiene placeholders y ningún secreto en los archivos versionados.
+
+**Conservado deliberadamente:** `safesite_dataset/` + `.ndjson` (respaldo crudo IRRECUPERABLE — regla 1 del repo), `dataset_v2/` (split oficial activo), `dataset_v3/` (decisión del usuario: conservar; regenerable con `eda/07`), `image_downloader.py` (decisión del usuario: conservar como registro histórico; obsoleto desde E13), `runs/safesite/*/` completos menos `last.pt` (best.pt + métricas + plots = trazabilidad de experimentos), evidencias documentadas (`pruebas/`, `validacion_anclaje/`, `piloto_diag.log`), `yolov8n.pt`/`yolov8s.pt` de la raíz (semillas de reproducibilidad, re-descargables).
 
 ---
 

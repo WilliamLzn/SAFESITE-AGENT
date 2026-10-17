@@ -20,9 +20,10 @@ SAFESITE-AGENT/
 ├── src/
 │   └── entrenamiento/
 │       └── entrenar_baseline.py   # entrenamiento YOLOv8n (seed 42, workers=0 en Windows, ver BITACORA E15)
-├── runs/
-│   ├── safesite/baseline_v1/      # RUN COMPLETO: best.pt, results.csv, confusion_matrix.png, args.yaml
-│   └── detect/val{,-2}            # plots de evaluación val/test
+├── runs/                           # artefactos de ejecución (gitignored; depurado en E39)
+│   ├── safesite/baseline_v1/        # entrenamientos: baseline_v1, tuned_v1 (hallazgo negativo) y
+│   │                               # tuned_v2_s/weights/best.pt = CHECKPOINT DE DESPLIEGUE (P8)
+│   └── agente/                     # pruebas/ y validacion_anclaje/ (evidencia bitácora), banco_vivo/, alertas/ (se vacía)
 ├── Documentation/
 │   ├── EDA_SAFESITE_DATASET.md    # informe EDA (hallazgos F1–F10)
 │   ├── ROADMAP_AGENTE.md          # plan de ejecución del agente (Fases 0–5)
@@ -69,7 +70,16 @@ Documentación completa de las skills (procedencia, licencias, contenido): `Docu
 - **Fase 4 COMPLETADA (E24–E27), incluida la final: PANEL EN VIVO POR WEBCAM.**
   - `panel.py` (Flask + MJPEG): http://localhost:5000 con video anotado en tiempo real, tarjetas EPP por clase, log de incidentes y WhatsApp asíncrono (el video no se congela al enviar). Ejecutar: `.venv\Scripts\python.exe -m src.safesite.panel [--zona X --device 0 --sin-whatsapp]`.
   - Arquitectura de sesión en vivo: `piloto.py` (webhook+túnel, puerto 8000) y `panel.py` (webcam+video, puerto 5000) corren EN PARALELO → alertas con foto + INFO conversacional durante la sesión en vivo.
-- **Todas las fases del roadmap (0–4) cerradas.** Pendientes opcionales: calibrar `UMBRAL_INCUMPLIMIENTO` según falsas alarmas del piloto real, human-in-the-loop con retroalimentación, túnel con nombre/dominio para producción, y push a GitHub.
+- **Todas las fases del roadmap (0–4) cerradas.** Pendientes opcionales: calibrar `UMBRAL_INCUMPLIMIENTO` según falsas alarmas del piloto real, human-in-the-loop con retroalimentación, y túnel con nombre/dominio para producción. **Push a GitHub hecho en E39.**
+- **Entrega final del curso (14-oct, E30–E31):** artefactos para el enunciado de la entrega:
+  - **Suite de pruebas Fase 3** (`src/safesite/pruebas_medidas.py`): 4 medidas pre-registradas (M1 recall incidente ≥0.70, M2 falsas ≤0.10, M3 alerta <10 s, M4 cooldown), 13 escenarios (normales/límite/falla esperada) × 5 reps, logs en `runs/agente/pruebas/` (log_ejecucion.jsonl + CSV + JSON + tabla MD).
+  - **Anclaje visual E30→E34 (consciente del régimen):** `goggles`/`no_goggle` se re-anclan a nivel de ojos con regla por régimen — full-body (dataset MOCS): centro de la caja del casco − 15 % su altura; primer plano (webcam): borde inferior del casco + 20 % de la caja de gafas; cabeza descubierta: mitad superior de la cabeza. Con zona muerta y clamp anatómico [3–45 %]. Clase `none` ya no se dibuja (ruido). Corrección cosmética; métricas intactas.
+  - **Documentos de la entrega:** `Documentation/MATRIZ_DECISION.md` (Fase 1: SAFESITE 4.85 vs PredictMaint 2.90, sensibilidad incluida), `Documentation/TABLA_CAMBIOS.md`, `Documentation/DESARROLLO_AGENTE.md` (sección 9 completa con UML Mermaid), `Documentation/GUION_VIDEO.md`, `requirements.txt`, `.env.example`.
+  - `agente.procesar_frame` valida frames inválidos (None/1 canal) → `frames_fallidos` (requisito "sensor sin dato" del enunciado); `agente.reset()` para repeticiones de pruebas.
+  - **Anti-spam del canal + control manual (E32):** `COOLDOWN_GLOBAL_S=60` y `MAX_MENSAJES_HORA=20` en `ActuadorWhatsApp` (solo el canal externo); panel con botones **Pausar WhatsApp** y **Enviar alerta ahora** (`POST /whatsapp/toggle`, `POST /alerta/manual`); `forzar=True` para envíos deliberados (botón manual, `prueba_whatsapp.py`). Lección de E32: en PowerShell, `$env:VAR=''` ELIMINA la variable (el cargador de .env la re-pobla) — para forzar DRY-RUN usar nombres de env inexistentes, nunca variables vacías.
+  - **Perfil VIVO de umbrales + coherencia (E33/E35, resuelve P10 parcialmente):** dos perfiles documentados — `evaluacion` (umbral global `no_*` 0.15, default de suite/demo; métricas E31 intactas) y `vivo` (default del panel; por clase: no_helmet 0.18, no_goggle 0.18, no_gloves 0.25, no_boots 0.15, **más `REGLA_COHERENCIA_VIVO`**: positivo detectado en la misma persona suprime su `no_*` contradictorio, p.ej. un guante visto + no_gloves de la otra mano). `SafeSiteAgent(perfil_umbrales=..., coherencia=...)` + `panel.py --perfil {vivo,evaluacion}`.
+  - **Banco de pruebas en vivo (E36, en curso):** diagnóstico cuantitativo del dominio webcam — `no_goggle` es el eslabón débil (recall incidente 0.44 val / 0.54 test) y **no existe clase `no_vest`** (el agente no puede alertar "SIN CHALECO" por diseño). Herramientas: `python -m src.safesite.capturar_banco --device 0` (captura por escenario, frames crudos a `runs/agente/banco_vivo/capturas/` — insumo también del fine-tune) y `python -m src.safesite.banco_vivo --device 0` (evalúa ambos perfiles, reportes en `eda/salidas/banco_vivo_*.{json,md}`; sin actuadores). Plan E37+: capturas → banco → decidir chaleco (clase 12 `no_vest` vs regla) → etiquetar → fine-tune desde `tuned_v2_s` → re-banco antes/después.
+  - **Regla operativa WhatsApp (E37/E38, resuelto):** la API acepta el envío (200+wamid) pero falla silenciosamente si la **ventana de 24 h** está cerrada (error 131047, visible solo en los `statuses` del webhook — ya se loguean). Si pasan >24 h sin actividad, el supervisor debe **escribir primero** al número de prueba (+1 555-667-8447) para abrir la ventana; fuera de ventana en producción, usar plantilla `alerta_epp` (`construir_payload`). Diagnóstico: `prueba_whatsapp.py --rutas <img>` prueba escenas concretas; `ActuadorWhatsApp._post` ahora loguea el cuerpo del error de Meta.
 - **Regla operativa (lección E15/E16 de la bitácora):** una sola sesión de agente a la vez sobre este repositorio. En Windows usar `workers=0` en DataLoader (riesgo WinError 1455) y **verificar** la identidad de procesos antes de matarlos.
 - Comandos de entrenamiento: desde la raíz, `.venv\Scripts\python.exe src\entrenamiento\entrenar_baseline.py --name <nuevo_run>` (el script se niega a sobrescribir runs existentes — usar nombre nuevo por experimento).
 

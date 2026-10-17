@@ -96,15 +96,139 @@ class Percepcion:
                 ))
         return detecciones
 
+    # ---------- anclaje anatomico (E30) ----------
+
+    @staticmethod
+    def _persona_contenedora(deteccion, personas):
+        """Persona cuya caja mejor contiene la deteccion (None si <30%)."""
+        x1, y1, x2, y2 = deteccion.caja
+        area = max((x2 - x1) * (y2 - y1), 1e-6)
+        mejor, mejor_frac = None, 0.0
+        for p in personas:
+            px1, py1, px2, py2 = p.caja
+            ix = max(0.0, min(x2, px2) - max(x1, px1))
+            iy = max(0.0, min(y2, py2) - max(y1, py1))
+            frac = (ix * iy) / area
+            if frac > mejor_frac:
+                mejor_frac, mejor = frac, p
+        return mejor if mejor_frac >= 0.3 else None
+
+    @staticmethod
+    def _casco_de_persona(persona, cascos, ref_x):
+        """Casco/no_helmet sobre la cabeza de `persona` mas cercano a ref_x."""
+        px1, py1, px2, py2 = persona.caja
+        mejor, mejor_d = None, float("inf")
+        for c in cascos:
+            cx = (c.caja[0] + c.caja[2]) / 2
+            cy = (c.caja[1] + c.caja[3]) / 2
+            en_cabeza = py1 <= cy <= py1 + 0.35 * (py2 - py1)
+            if px1 <= cx <= px2 and en_cabeza:
+                if abs(cx - ref_x) < mejor_d:
+                    mejor_d, mejor = abs(cx - ref_x), c
+        return mejor
+
+    @staticmethod
+    def _reanclar_a_ojos(caja, persona, casco):
+        """Reposiciona la caja (goggles/no_goggle) a nivel de ojos (E30/E34).
+
+        El dataset fuente etiqueta 'goggles' con sesgo hacia abajo (mediana
+        14.5% de la altura de la persona vs ~8% de los ojos humanos). Al
+        dibujar se ancla la caja DONDE DEBERIAN estar las gafas.
+
+        E34: la geometria depende del REGIMEN de la imagen —
+        - fotos de obra (cuerpo completo): las cajas de casco del dataset
+          vienen infladas hacia el rostro (borde inferior ~18% de la
+          persona) -> los ojos caen DENTRO de la caja: centro - 15% altura;
+        - webcam primer plano: la caja del casco es ajustada y los ojos
+          caen JUSTO DEBAJO de su borde inferior (brim) -> borde + 20% de
+          la altura de la propia caja de gafas;
+        - cabeza descubierta (no_helmet): caja = cabeza, ojos a la mitad
+          superior (50%).
+        Solo desplaza HACIA ARRIBA (nunca baja una caja correcta) y limita
+        el ancla a un rango anatomico sensato (3%-35% de la persona).
+        """
+        x1, y1, x2, y2 = caja
+        h = y2 - y1
+        cy = (y1 + y2) / 2
+        py1, py2 = persona.caja[1], persona.caja[3]
+        ph = py2 - py1
+        if casco is not None:
+            if casco.cls_id == 7:
+                # cabeza descubierta: ojos a la mitad superior de la cabeza
+                ch = casco.caja[3] - casco.caja[1]
+                objetivo = casco.caja[1] + 0.5 * ch
+            else:
+                ch = casco.caja[3] - casco.caja[1]
+                # fracción de persona donde termina el casco -> regimen
+                borde = (casco.caja[3] - py1) / ph
+                if borde <= 0.25:
+                    # full-body (MOCS: casco inflado, ojos dentro de la caja)
+                    objetivo = (casco.caja[1] + casco.caja[3]) / 2 - 0.15 * ch
+                else:
+                    # primer plano (casco ajustado): ojos bajo el brim
+                    objetivo = casco.caja[3] + 0.20 * h
+        else:
+            objetivo = py1 + config.FRACCION_OJOS * ph
+        # clamp anatomico: ojos dentro [3%, 45%] de la altura de la persona
+        # (en primer plano cabeza+torso los ojos quedan ~38-40%; en
+        # full-body ~8%; 45% evita arrastrar una caja al pecho)
+        objetivo = min(max(objetivo, py1 + 0.03 * ph), py1 + 0.45 * ph)
+        # y sin salir por arriba de la persona
+        objetivo = max(objetivo, py1 + h / 2 + 2)
+        if cy <= objetivo + 0.25 * h:
+            return [x1, y1, x2, y2]        # ya esta a nivel de ojos (zona muerta)
+        delta = objetivo - cy
+        return [x1, y1 + delta, x2, y2 + delta]
+
+    @staticmethod
+    def _etiqueta_con_fondo(img, texto, x, y, color, escala=0.5, grosor=1):
+        """Texto blanco sobre rectangulo solido del color de la clase."""
+        (tw, th), base = cv2.getTextSize(texto, cv2.FONT_HERSHEY_SIMPLEX,
+                                         escala, grosor)
+        y_txt = max(th + base + 4, y)
+        cv2.rectangle(img, (x - 1, y_txt - th - base - 3),
+                      (x + tw + 1, y_txt + 2), color, -1)
+        cv2.putText(img, texto, (x, y_txt - base - 1),
+                    cv2.FONT_HERSHEY_SIMPLEX, escala, (255, 255, 255), grosor)
+
     @staticmethod
     def anotar(frame, detecciones, grueso=2):
-        """Dibuja las detecciones: rojo si es incumplimiento, verde si es EPP."""
+        """Dibuja las detecciones con anclaje anatomico y etiquetas legibles.
+
+        - rojo = incumplimiento (`no_*`), verde = EPP correcto,
+          celeste = Persona (caja mas gruesa);
+        - etiquetas en espanol con fondo solido (legibles en video);
+        - `goggles`/`no_goggle` se re-anclan a nivel de ojos de la persona
+          que las contiene (E30: el dataset fuente las etiqueta por debajo
+          de la cara; ver config y BITACORA).
+        """
         anotado = frame.copy()
-        for d in detecciones:
-            color = (0, 0, 255) if d.cls_id in config.CLASES_INCUMPLIMIENTO else (0, 200, 0)
+        personas = [d for d in detecciones if d.cls_id == 6]
+        cascos = [d for d in detecciones if d.cls_id in (0, 7)]
+        # 1) personas primero (las cajas de EPP van encima)
+        for d in personas:
             x1, y1, x2, y2 = [int(v) for v in d.caja]
+            cv2.rectangle(anotado, (x1, y1), (x2, y2), (255, 200, 100),
+                          grueso + 1)
+            Percepcion._etiqueta_con_fondo(
+                anotado, f"Persona {d.conf:.2f}", x1, y1 - 2, (180, 120, 40))
+        # 2) EPP e incumplimientos (la clase 5 'none' no se dibuja: no es
+        #    alerta ni informa al supervisor; solo anade ruido visual)
+        for d in detecciones:
+            if d.cls_id in (5, 6):
+                continue
+            color = ((0, 0, 255) if d.cls_id in config.CLASES_INCUMPLIMIENTO
+                     else (0, 200, 0))
+            caja = d.caja
+            if d.cls_id in config.CLASES_OJOS:
+                persona = Percepcion._persona_contenedora(d, personas)
+                if persona is not None:
+                    casco = Percepcion._casco_de_persona(
+                        persona, cascos, (caja[0] + caja[2]) / 2)
+                    caja = Percepcion._reanclar_a_ojos(caja, persona, casco)
+            x1, y1, x2, y2 = [int(v) for v in caja]
             cv2.rectangle(anotado, (x1, y1), (x2, y2), color, grueso)
-            etiqueta = f"{d.nombre} {d.conf:.2f}"
-            cv2.putText(anotado, etiqueta, (x1, max(15, y1 - 6)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+            Percepcion._etiqueta_con_fondo(
+                anotado, f"{config.NOMBRES_ES[d.cls_id]} {d.conf:.2f}",
+                x1, y1 - 2, color)
         return anotado

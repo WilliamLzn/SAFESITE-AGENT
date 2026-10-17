@@ -117,6 +117,19 @@ class Manejador(BaseHTTPRequestHandler):
         for entrada in datos.get("entry", []):
             for cambio in entrada.get("changes", []):
                 valor = cambio.get("value", {})
+                # estados de entrega de NUESTROS envios (sent/delivered/
+                # failed/read) — diagnostico E37: sin esto, un mensaje
+                # aceptado por la API pero no entregado es invisible
+                for estado in valor.get("statuses", []):
+                    errores = estado.get("errors") or []
+                    extra = ""
+                    if errores:
+                        extra = " — errores: " + "; ".join(
+                            f"{e.get('code')} {e.get('title')}"
+                            for e in errores)
+                    print(f"📤 estado de mensaje "
+                          f"{str(estado.get('id', ''))[:30]}...: "
+                          f"{estado.get('status')}{extra}", flush=True)
                 for msj in valor.get("messages", []):
                     if msj.get("type") != "text":
                         continue

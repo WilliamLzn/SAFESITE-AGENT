@@ -11,6 +11,8 @@ developers.facebook.com + plantilla de mensaje aprobada). Sin credenciales,
 el actuador opera en modo DRY-RUN: construye el mensaje y lo registra.
 """
 import os
+import time
+from collections import deque
 
 from . import config
 
@@ -99,6 +101,41 @@ class ActuadorWhatsApp(ActuadorBase):
         self.token = os.environ.get(token_env)
         self.phone_id = os.environ.get(phone_id_env)
         self.tiempos_envio_ms = []
+        # E32: limites anti-spam GLOBALES del canal (no por clase)
+        self._t_ultimo_envio = None
+        self._envios_hora = deque()      # marcas de tiempo de los envios de la ultima hora
+        self.alertas_suprimidas = 0
+
+    # ---------- limites anti-spam del canal (E32) ----------
+
+    def _permite_envio(self, forzar=False):
+        """True si el mensaje puede enviarse segun los limites globales.
+
+        Los envios manuales (forzar=True) los solicita explicitamente el
+        supervisor desde el panel o la prueba end-to-end: bypassan los
+        limites (pero CONSUMEN las cuotas, como cualquier envio).
+        """
+        if forzar:
+            return True, None
+        ahora = time.time()
+        if (self._t_ultimo_envio is not None
+                and ahora - self._t_ultimo_envio < config.COOLDOWN_GLOBAL_S):
+            falta = config.COOLDOWN_GLOBAL_S - (ahora - self._t_ultimo_envio)
+            return False, (f"cooldown global del canal "
+                           f"({falta:.0f}s restantes)")
+        while self._envios_hora and ahora - self._envios_hora[0] > 3600.0:
+            self._envios_hora.popleft()
+        if len(self._envios_hora) >= config.MAX_MENSAJES_HORA:
+            return False, (f"tope de {config.MAX_MENSAJES_HORA} "
+                           f"mensajes/hora alcanzado")
+        return True, None
+
+    def _registrar_envio(self):
+        """Consume las cuotas globales (solo tras un envio exitoso o
+        DRY-RUN equivalente; un envio fallido NO consume)."""
+        ahora = time.time()
+        self._t_ultimo_envio = ahora
+        self._envios_hora.append(ahora)
 
     @property
     def modo(self):
@@ -116,11 +153,18 @@ class ActuadorWhatsApp(ActuadorBase):
 
     def _post(self, ruta, json=None, data=None, files=None):
         import requests
-        import time
         t0 = time.perf_counter()
         resp = requests.post(self._url(ruta), headers=self._headers(),
                              json=json, data=data, files=files, timeout=30)
         self.tiempos_envio_ms.append((time.perf_counter() - t0) * 1000)
+        if not resp.ok:
+            # E37: incluir el cuerpo del error de Meta (code/message) para
+            # que un 400 sea autodiagnosticable ("API access blocked",
+            # "Re-engagement message", token expirado, etc.)
+            detalle = " ".join(resp.text[:300].split())
+            raise requests.HTTPError(
+                f"{resp.status_code} {resp.reason} — Meta: {detalle}",
+                response=resp)
         return resp
 
     # ---------- envios ----------
@@ -202,12 +246,20 @@ class ActuadorWhatsApp(ActuadorBase):
             f"_Responde_ **INFO** _si quieres ver el detalle técnico._"
         )
 
-    def alertar(self, incidente, frame_anotado=None, ruta_frame=None):
+    def alertar(self, incidente, frame_anotado=None, ruta_frame=None,
+                forzar=False):
         caption = self._caption(incidente)
+        permitido, motivo = self._permite_envio(forzar)
+        if not permitido:
+            self.alertas_suprimidas += 1
+            print(f"🔕 WhatsApp: alerta suprimida ({motivo}) "
+                  f"[{incidente.clase} @ {incidente.zona}]")
+            return None
         if self.modo != "ENVIO-REAL":
             print(f"📲 WhatsApp[DRY-RUN] -> {caption} "
                   f"(sin credenciales en el entorno)")
-            return None
+            self._registrar_envio()
+            return "dry-run"
 
         # 1) intentar con la imagen del frame anotado
         if frame_anotado is not None:
@@ -220,6 +272,7 @@ class ActuadorWhatsApp(ActuadorBase):
                 media_id = self.subir_imagen_bytes(buf.tobytes(),
                                                    nombre="safesite_alerta.jpg")
                 wamid = self.enviar_imagen(media_id, caption)
+                self._registrar_envio()
                 print(f"📲 WhatsApp[ENVIO-REAL] imagen+caption enviado "
                       f"(wamid {wamid[:18]}...)")
                 return wamid
@@ -230,6 +283,7 @@ class ActuadorWhatsApp(ActuadorBase):
         # 2) fallback: texto puro (la alerta nunca se pierde)
         try:
             wamid = self.enviar_texto(caption)
+            self._registrar_envio()
             print(f"📲 WhatsApp[ENVIO-REAL] texto enviado "
                   f"(wamid {wamid[:18]}...)")
             return wamid
@@ -237,14 +291,26 @@ class ActuadorWhatsApp(ActuadorBase):
             print(f"❌ WhatsApp: fallo tambien el envio de texto: {e}")
             return None
 
-    def alertar_lote(self, incidentes, frame_anotado=None, ruta_frame=None):
+    def alertar_lote(self, incidentes, frame_anotado=None, ruta_frame=None,
+                     forzar=False):
         """Alerta CONSOLIDADA: un solo mensaje con todas las faltas del frame
-        y una sola foto (optimiza mensajes, llamadas API y latencia)."""
+        y una sola foto (optimiza mensajes, llamadas API y latencia).
+
+        E32: respeta los limites anti-spam GLOBALES del canal salvo
+        `forzar=True` (envio manual explicito del supervisor)."""
         caption = self._caption_lote(incidentes)
+        permitido, motivo = self._permite_envio(forzar)
+        if not permitido:
+            self.alertas_suprimidas += 1
+            clases = ", ".join(i.clase for i in incidentes)
+            print(f"🔕 WhatsApp: lote ({len(incidentes)} faltas: {clases}) "
+                  f"suprimido ({motivo})")
+            return None
         if self.modo != "ENVIO-REAL":
             print(f"📲 WhatsApp[DRY-RUN] lote ({len(incidentes)} faltas) -> "
                   f"{caption[:120]}...")
-            return None
+            self._registrar_envio()
+            return "dry-run"
 
         if frame_anotado is not None:
             try:
@@ -256,6 +322,7 @@ class ActuadorWhatsApp(ActuadorBase):
                 media_id = self.subir_imagen_bytes(buf.tobytes(),
                                                    nombre="safesite_alerta.jpg")
                 wamid = self.enviar_imagen(media_id, caption)
+                self._registrar_envio()
                 print(f"📲 WhatsApp[ENVIO-REAL] lote {len(incidentes)} faltas, "
                       f"imagen+caption enviado (wamid {wamid[:18]}...)")
                 return wamid
@@ -265,6 +332,7 @@ class ActuadorWhatsApp(ActuadorBase):
 
         try:
             wamid = self.enviar_texto(caption)
+            self._registrar_envio()
             print(f"📲 WhatsApp[ENVIO-REAL] lote {len(incidentes)} faltas, "
                   f"texto enviado (wamid {wamid[:18]}...)")
             return wamid

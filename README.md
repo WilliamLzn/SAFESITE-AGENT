@@ -207,6 +207,9 @@ Requisitos: **Python 3.11+** con el entorno `.venv` (torch + ultralytics). Crede
 # Demo del agente sobre el dataset (simulación de video, métricas de incidente)
 .venv\Scripts\python.exe -m src.safesite.demo
 
+# Suite de pruebas de la entrega (M1-M4 pre-registradas, 13 escenarios × 5 reps, logs)
+.venv\Scripts\python.exe -m src.safesite.pruebas_medidas --device 0
+
 # Panel web EN VIVO por webcam → http://localhost:5000
 .venv\Scripts\python.exe -m src.safesite.panel --device 0
 
@@ -218,6 +221,10 @@ Requisitos: **Python 3.11+** con el entorno `.venv` (torch + ultralytics). Crede
 ```
 
 > 🎥 **Sesión en vivo completa:** `piloto.py` (puerto 8000) y `panel.py` (puerto 5000) en paralelo → alertas con foto por WhatsApp + respuesta **INFO** conversacional mientras el video sigue fluyendo.
+>
+> 🔕 **Control del canal desde el panel:** botón **⏸️ Pausar WhatsApp** (los incidentes se siguen registrando en el panel y el historial, pero no llegan al teléfono) y botón **📨 Enviar alerta ahora** (envía el estado actual de la zona bajo petición explícita). Además, límites anti-spam globales del canal: mínimo 60 s entre mensajes y tope de 20/hora (`config.COOLDOWN_GLOBAL_S`, `MAX_MENSAJES_HORA`).
+>
+> 🎚️ **Perfil de umbrales (E33/E35):** el panel corre por defecto en perfil **vivo** — umbrales por clase calibrados en el piloto real (casco 0.18, gafas 0.18, guantes 0.25, botas 0.15) **+ regla de coherencia por persona** (si el positivo del EPP está detectado en la misma persona, el `no_*` contradictorio se suprime). La suite y el demo usan el perfil **evaluación** (umbral global 0.15) con el que se validaron las métricas. Cambiar con `--perfil evaluacion`.
 
 ---
 
@@ -232,7 +239,7 @@ Requisitos: **Python 3.11+** con el entorno `.venv` (torch + ultralytics). Crede
 | 4 | Actuadores: WhatsApp bidireccional + panel web en vivo | ✅ |
 | 5 | Mejora continua (calibrar umbral, human-in-the-loop, dominio fijo) | 🔄 |
 
-Detalle completo: `Documentation/ROADMAP_AGENTE.md` · historial de ejecuciones: `Documentation/BITACORA.md` (E1–E29).
+Detalle completo: `Documentation/ROADMAP_AGENTE.md` · historial de ejecuciones: `Documentation/BITACORA.md` (E1–E31).
 
 ---
 

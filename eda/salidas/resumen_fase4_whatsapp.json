@@ -3,47 +3,21 @@
   "modelo": "runs\\safesite\\tuned_v2_s\\weights\\best.pt",
   "device": "0",
   "split": "val",
-  "escenas_procesadas": 3,
+  "escenas_procesadas": 1,
   "escenas_usadas": [
     {
-      "indice": 3,
-      "gt": [
-        7,
-        8,
-        9
-      ],
+      "indice": "7e05019e848407b6e51380cc9bf48626",
+      "gt": [],
       "alertadas": [
-        "no_gloves",
-        "no_helmet"
-      ]
-    },
-    {
-      "indice": 4,
-      "gt": [
-        7,
-        9
-      ],
-      "alertadas": [
-        "no_gloves",
-        "no_helmet"
-      ]
-    },
-    {
-      "indice": 5,
-      "gt": [
-        7,
-        8
-      ],
-      "alertadas": [
-        "no_helmet"
+        "no_boots"
       ]
     }
   ],
-  "escenas_con_alerta_whatsapp": 3,
+  "escenas_con_alerta_whatsapp": 1,
   "nota": "alertas CONSOLIDADAS: un mensaje por escena con todas las faltas y una sola foto",
-  "llamadas_http_api": 6,
-  "latencia_whatsapp_media_ms": 1905.4,
-  "latencia_whatsapp_max_ms": 2528.8,
-  "latencia_agente_media_ms": 1481.0,
-  "duracion_total_s": 14.8
+  "llamadas_http_api": 2,
+  "latencia_whatsapp_media_ms": 1050.9,
+  "latencia_whatsapp_max_ms": 1213.9,
+  "latencia_agente_media_ms": 1792.4,
+  "duracion_total_s": 7.2
 }

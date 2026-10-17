@@ -16,23 +16,73 @@ from .actuarios import ActuadorConsola, ActuadorWhatsApp
 
 class SafeSiteAgent:
     def __init__(self, ruta_modelo=None, device=None,
-                 actuadores=None, cooldown_s=None, guardar_frames=True):
+                 actuadores=None, cooldown_s=None, guardar_frames=True,
+                 perfil_umbrales=None, coherencia=None):
+        self.perfil_umbrales = perfil_umbrales   # E33: None=evaluacion | dict=vivo
+        self.coherencia = coherencia             # E35: regla por persona (vivo)
         self.percepcion = Percepcion(ruta_modelo=ruta_modelo, device=device)
-        self.razonamiento = Razonamiento()
+        self.razonamiento = Razonamiento(
+            umbrales_incumplimiento=perfil_umbrales, coherencia=coherencia)
         self.memoria = Memoria(cooldown_s=cooldown_s)
         self.guardar_frames = guardar_frames
         self.actuadores = actuadores or [ActuadorConsola(), ActuadorWhatsApp()]
         self.latencias_ms = []       # metrica: tiempo end-to-end por frame
         self.alertas_emitidas = 0
         self.alertas_bloqueadas_cooldown = 0
+        self.frames_fallidos = 0     # percepciones que fallaron (sensor sin dato)
+
+    def reset(self):
+        """Reinicia el estado interno (rachas, cooldown y contadores).
+
+        Usado por la suite de pruebas (Fase 3 del enunciado) para repetir
+        escenarios con el agente en estado limpio, sin recargar el modelo.
+        El perfil de umbrales y la regla de coherencia (E33/E35) se
+        CONSERVAN entre resets.
+        """
+        self.razonamiento = Razonamiento(
+            umbrales_incumplimiento=self.perfil_umbrales,
+            coherencia=self.coherencia)
+        self.memoria = Memoria()
+        self.latencias_ms.clear()
+        self.alertas_emitidas = 0
+        self.alertas_bloqueadas_cooldown = 0
+        self.frames_fallidos = 0
 
     def procesar_frame(self, frame, zona, t_stamp=None, origen=""):
-        """Un ciclo completo del agente sobre un fotograma."""
+        """Un ciclo completo del agente sobre un fotograma.
+
+        Tolerancia a falla del sensor (enunciado Fase 2, "sensor sin
+        dato"): si la percepcion lanza (frame corrupto, None, formato
+        invalido), el agente lo registra, NO actua y continua con el
+        siguiente frame. La racha de confirmacion temporal NO se rompe
+        ante un fallo transitorio (decision documentada).
+        """
         t0 = time.perf_counter()
         t_stamp = t_stamp if t_stamp is not None else t0
 
         # 1) PERCIBIR
-        detecciones = self.percepcion.detectar(frame)
+        frame_invalido = (
+            frame is None
+            or not hasattr(frame, "shape")
+            or getattr(frame, "ndim", 0) < 3
+            or frame.size == 0
+        )
+        if frame_invalido:
+            # sensor sin dato (frame corrupto, negro, None o formato invalido):
+            # registrar, NO actuar y continuar con el siguiente frame. La
+            # racha de confirmacion temporal NO se rompe ante un fallo
+            # transitorio (decision documentada en la bitacora).
+            self.frames_fallidos += 1
+            print(f"⚠️ percepcion sin dato (frame invalido) zona={zona} "
+                  f"origen={origen}", flush=True)
+            return [], []
+        try:
+            detecciones = self.percepcion.detectar(frame)
+        except Exception as e:
+            self.frames_fallidos += 1
+            print(f"⚠️ percepcion fallo zona={zona} origen={origen}: "
+                  f"{type(e).__name__}: {e}", flush=True)
+            return [], []
 
         # 2) RAZONAR (umbral por clase + confirmacion temporal)
         filtradas = self.razonamiento.filtrar_por_clase(detecciones)
@@ -65,6 +115,7 @@ class SafeSiteAgent:
     def resumen_ejecucion(self):
         return {
             "frames_procesados": len(self.latencias_ms),
+            "frames_fallidos": self.frames_fallidos,
             "latencia_media_ms": round(self.latencia_media_ms, 1),
             "latencia_max_ms": round(max(self.latencias_ms), 1) if self.latencias_ms else 0,
             "alertas_emitidas": self.alertas_emitidas,

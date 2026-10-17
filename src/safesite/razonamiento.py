@@ -45,9 +45,32 @@ class Incidente:
 class Razonamiento:
     """Evalua observaciones y decide cuando hay un incidente confirmado."""
 
-    def __init__(self):
+    def __init__(self, umbrales_incumplimiento=None, coherencia=None):
         # estado de corto plazo: (zona, clase_id) -> info de la racha actual
         self._rachas = {}
+        # E33: umbral POR CLASE `no_*` (perfil VIVO calibrado en el piloto).
+        # None = umbral global de evaluacion (config.UMBRAL_INCUMPLIMIENTO).
+        self.umbrales_incumplimiento = umbrales_incumplimiento
+        # E35: regla de coherencia por persona (solo perfil VIVO):
+        # {cls_positivo: cls_no_*} — si el positivo esta detectado en la
+        # MISMA persona, el `no_*` contradictorio se suprime.
+        self.coherencia = coherencia or None
+        self.suprimidas_coherencia = 0
+
+    @staticmethod
+    def _persona_contenedora(det, personas):
+        """Persona cuya caja mejor contiene la deteccion (>=30% de su area)."""
+        x1, y1, x2, y2 = det.caja
+        area = max((x2 - x1) * (y2 - y1), 1e-6)
+        mejor, mejor_frac = None, 0.0
+        for p in personas:
+            px1, py1, px2, py2 = p.caja
+            ix = max(0.0, min(x2, px2) - max(x1, px1))
+            iy = max(0.0, min(y2, py2) - max(y1, py1))
+            frac = (ix * iy) / area
+            if frac > mejor_frac:
+                mejor_frac, mejor = frac, p
+        return mejor if mejor_frac >= 0.3 else None
 
     def evaluar(self, zona, t_stamp, detecciones_filtradas, origen=""):
         """Devuelve la lista de incidentes confirmados en este frame.
@@ -101,14 +124,60 @@ class Razonamiento:
         #    lo maneja la Memoria; aqui evitamos doble emision en la misma racha)
         return confirmados
 
-    @staticmethod
-    def filtrar_por_clase(detecciones):
-        """Aplica el umbral de confianza POR CLASE (positivas vs no_*)."""
+    def filtrar_por_clase(self, detecciones):
+        """Aplica el umbral de confianza POR CLASE (positivas vs no_*).
+
+        Con perfil VIVO (E33) cada clase `no_*` usa su umbral calibrado de
+        `self.umbrales_incumplimiento` (dict {cls_id: umbral}); sin perfil,
+        el umbral global de evaluacion. Las clases positivas siempre usan
+        config.UMBRAL_DEFECTO.
+
+        E35 (solo perfil VIVO, con `self.coherencia`): coherencia por
+        persona — si el positivo de un EPP (ej. `gloves` en una mano) esta
+        detectado en la MISMA persona, el `no_*` contradictorio (ej.
+        `no_gloves` generado por la otra mano no detectada) se suprime.
+        """
         salida = []
         for d in detecciones:
-            umbral = (config.UMBRAL_INCUMPLIMIENTO
-                      if d.cls_id in config.CLASES_INCUMPLIMIENTO
-                      else config.UMBRAL_DEFECTO)
+            if d.cls_id in config.CLASES_INCUMPLIMIENTO:
+                if self.umbrales_incumplimiento is not None:
+                    umbral = self.umbrales_incumplimiento.get(
+                        d.cls_id, config.UMBRAL_INCUMPLIMIENTO)
+                else:
+                    umbral = config.UMBRAL_INCUMPLIMIENTO
+            else:
+                umbral = config.UMBRAL_DEFECTO
             if d.conf >= umbral:
                 salida.append(d)
+
+        # --- E35: coherencia por persona (solo si el perfil lo activa) ---
+        if self.coherencia:
+            personas = [d for d in salida if d.cls_id == 6]
+            if personas:
+                # clases positivas presentes por persona (id del objeto Persona)
+                positivos_por_persona = {}
+                for d in salida:
+                    if d.cls_id in self.coherencia:
+                        per = self._persona_contenedora(d, personas)
+                        if per is not None:
+                            positivos_por_persona.setdefault(
+                                id(per), set()).add(d.cls_id)
+                conservar = []
+                for d in salida:
+                    suprimir = False
+                    if d.cls_id in self.coherencia.values():
+                        per = self._persona_contenedora(d, personas)
+                        if per is not None:
+                            presentes = positivos_por_persona.get(id(per), set())
+                            if any(self.coherencia[p] == d.cls_id
+                                   for p in presentes):
+                                suprimir = True
+                                self.suprimidas_coherencia += 1
+                                print(f"🧠 coherencia: {d.nombre} "
+                                      f"(conf {d.conf:.2f}) suprimido — su "
+                                      f"positivo esta en la misma persona",
+                                      flush=True)
+                    if not suprimir:
+                        conservar.append(d)
+                salida = conservar
         return salida

@@ -1,0 +1,114 @@
+{
+  "fecha": "2026-10-16T19:13:13",
+  "config": {
+    "modelo": "runs\\safesite\\tuned_v2_s\\weights\\best.pt",
+    "device": "0",
+    "conf_inferencia": 0.15,
+    "k_frames": 3,
+    "fps_simulado": 2.0,
+    "umbral_defecto_positivos": 0.35,
+    "umbral_global_evaluacion": 0.15
+  },
+  "por_perfil": {
+    "evaluacion": {
+      "sin_casco": {
+        "n_frames": 6,
+        "deteccion_cruda_por_clase": {
+          "helmet": {
+            "tasa_frames": 3.0,
+            "conf": {
+              "mediana": 0.156,
+              "p25": 0.152,
+              "p75": 0.203,
+              "max": 0.203,
+              "n_detecciones": 18
+            }
+          },
+          "gloves": {
+            "tasa_frames": 1.0,
+            "conf": {
+              "mediana": 0.189,
+              "p25": 0.189,
+              "p75": 0.189,
+              "max": 0.189,
+              "n_detecciones": 6
+            }
+          },
+          "vest": {
+            "tasa_frames": 1.0,
+            "conf": {
+              "mediana": 0.255,
+              "p25": 0.255,
+              "p75": 0.255,
+              "max": 0.255,
+              "n_detecciones": 6
+            }
+          },
+          "none": {
+            "tasa_frames": 3.0,
+            "conf": {
+              "mediana": 0.219,
+              "p25": 0.183,
+              "p75": 0.509,
+              "max": 0.509,
+              "n_detecciones": 18
+            }
+          },
+          "Person": {
+            "tasa_frames": 4.0,
+            "conf": {
+              "mediana": 0.508,
+              "p25": 0.463,
+              "p75": 0.531,
+              "max": 0.547,
+              "n_detecciones": 24
+            }
+          },
+          "no_boots": {
+            "tasa_frames": 1.0,
+            "conf": {
+              "mediana": 0.3,
+              "p25": 0.3,
+              "p75": 0.3,
+              "max": 0.3,
+              "n_detecciones": 6
+            }
+          }
+        },
+        "presentes_esperados": {
+          "gloves": {
+            "detectado_en": 0,
+            "tasa_frames": 0.0
+          },
+          "vest": {
+            "detectado_en": 0,
+            "tasa_frames": 0.0
+          },
+          "goggles": {
+            "detectado_en": 0,
+            "tasa_frames": 0.0
+          }
+        },
+        "incidentes_confirmados": {
+          "no_boots": {
+            "conf_media": 0.3,
+            "frame_confirmacion": 2
+          }
+        },
+        "esperado": {
+          "alertas_esperadas": [
+            "no_helmet"
+          ],
+          "alertas_faltantes": [
+            "no_helmet"
+          ],
+          "alertas_inesperadas_FP": [
+            "no_boots"
+          ],
+          "recall_incidente": 0.0
+        },
+        "latencia_media_ms": 888.4
+      }
+    }
+  }
+}
