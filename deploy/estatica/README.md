@@ -2,7 +2,7 @@
 title: SafeSite Agent — Demo en vivo
 emoji: 🦺
 colorFrom: blue
-colorTo: orange
+colorTo: yellow
 sdk: static
 pinned: true
 ---
