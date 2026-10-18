@@ -23,3 +23,10 @@ Thumbs.db
 
 # --- Secretos (NUNCA versionar) ---
 .env
+
+# --- Despliegue HF Spaces (E40): staging espejo, se regenera con
+#     deploy/sincronizar_space.py; best.pt y evidencia E31 viven en el Space ---
+deploy/space_build/
+
+# --- pytest ---
+.pytest_cache/

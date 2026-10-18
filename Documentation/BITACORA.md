@@ -757,6 +757,146 @@ Justificación por clase: `no_helmet` 0.18 conserva las verdaderas más débiles
 
 ---
 
+### E40 — Página web de demostración (Hugging Face Spaces + Gradio): app lista, smoke local COMPLETO ✅ (17-oct)
+
+**Motivación (petición del usuario):** evidencia de funcionamiento del agente por la **Opción A del enunciado** (plataforma de despliegue con enlace público estable hasta la calificación), con demo en vivo, caso de falla esperada y ejecución de las pruebas visibles en la página.
+
+**Decisión de plataforma (matriz rápida):** **HF Spaces (Gradio, CPU free: 2 vCPU/16 GB)** — 16 GB RAM (vs 1 GB Streamlit Cloud), HTTPS nativo (la webcam del navegador lo exige), componente de cámara integrado, URL pública permanente, despliegue por git push/requirements. Render free se descartó (512 MB, duerme a 15 min); túnel local se descartó como evidencia principal (muere al apagar la laptop).
+
+**Diseño clave — LAYOUT ESPEJO:** el repo del Space replica la raíz del proyecto (`app.py` + `src/safesite/` + `runs/safesite/tuned_v2_s/weights/best.pt` + `dataset_v2/{images,labels}/{val,test}` + `runs/agente/pruebas/` con la evidencia E31). Como los módulos resuelven rutas relativas a la raíz, **el núcleo del agente corre en el Space SIN CAMBIOS** (21.5 MB modelo + 27.6 MB imágenes ≈ 50 MB de Space). Único cambio al núcleo: `config.py` con rutas `/` (válido en Windows y Linux).
+
+**La app (`deploy/app.py`, 4 pestañas, Gradio 6.30.0):**
+1. **📸 Demo en vivo** — webcam del navegador / subir imagen / **botón 🎲 foto aleatoria del set de test** (seed 42; muestra la etiqueta oficial → cada foto es un caso de prueba con veredicto ✅/❌). Cada imagen se procesa como racha de 4 frames @ 2 FPS (misma simulación que la suite) → imagen anotada, línea de tiempo de la confirmación K=3, detecciones filtradas y **payload WhatsApp DRY-RUN** (caption natural + plantilla `alerta_epp` en JSON). Incluye **simulación de falla del sensor** (frame None / negro / 1 canal). Estado por sesión vía `zona=web_<uuid>` (rachas/cooldown aislados, UN solo modelo en RAM).
+2. **🧪 Pruebas en vivo** — S1–S13 × 5 reps ejecutándose con progreso (barra + tabla que se llena) y **M1/M2 sobre los splits oficiales completos** (1 rep; determinista en CPU → reproduce el valor E31). Logs CSV/JSON/JSONL descargables en el mismo formato de la entrega.
+3. **📊 Resultados oficiales** — tabla MD de la corrida E31 (`20261014_170459`) + JSON + descargas.
+4. **ℹ️ Cómo probar** — casos de prueba sugeridos (requisito del enunciado).
+
+**Seguridad del despliegue público:** `.env` NUNCA se copia (el sincronizador tiene lista blanca explícita) → WhatsApp **DRY-RUN por construcción**; la pestaña demo usa `actuadores=[]` (cero efectos externos); **el número del supervisor se enmascara** en el payload mostrado (defensa en profundidad: `5731••••••93`); las pruebas usan `ActuadorRegistro` (canal interno).
+
+**Smoke local (17-oct, venv, CPU):**
+- `foto_aleatoria` → `verificar`: 12.2 s la primera (carga de modelo incluida) — luego ~1 s/captura. Escena control: 8 detecciones, sin incidentes, veredicto correcto.
+- Fallas: None → `frames_fallidos` +4; gris (1 canal) → +4; **negro → +0 (frame válido, sin detecciones ni alertas — S9 correcto por diseño)**.
+- **S1–S13 × 1 rep: 6.6 s** con los valores esperados de la suite (S2=1, S6=1 bloqueado, S7=2 permitido, S10/S11 sin crash, S12 alerta persistida con API caída, S13 arranque fallido controlado) → ×5 ≈ 35 s local, **2–5 min estimado en el Space**.
+- M1/M2: ~1.1 s/escena local → **~15–30 min en el Space** (botón opcional con advertencia de duración).
+- Ruta de incidente: confirmación K=3 en la línea de tiempo + caption natural + plantilla `alerta_epp` ✓.
+- Servidor Gradio local: HTTP 200 en `localhost:7860`, UI construida, detenido limpiamente.
+
+**Instalaciones en el venv:** `gradio 6.30.0`, `huggingface_hub 2.2.0` (no tocan torch/ultralytics: 2.14.1+cu130 / 8.4.176 intactos).
+
+**Archivos:** `deploy/app.py`, `deploy/requirements.txt` (torch 2.14.1 vía índice CPU + gradio 6.30.0), `deploy/packages.txt` (libgl1 para opencv en Linux), `deploy/README.md` (metadatos del Space + instrucciones), `deploy/.gitattributes` (LFS `*.pt`), `deploy/sincronizar_space.py` (ensambla `deploy/space_build/` —gitignored— y publica con `HfApi.upload_folder`, LFS automático >10 MB, crea el Space si no existe). Cambio al núcleo: `src/safesite/config.py` (rutas `/`). Sin cambios en agente/razonamiento/memoria/percepcion/actuarios/suite.
+
+**Pendiente (usuario):** crear cuenta HF + token de escritura → publicar:
+```powershell
+$env:HF_TOKEN = "hf_xxx"   # token de https://huggingface.co/settings/tokens
+.venv\Scripts\python.exe deploy\sincronizar_space.py --repo-id <usuario>/safesite-agent-demo
+```
+
+---
+
+### E41 — Pausa pre-despliegue: 3 correcciones (textos, actuador demo, verificación botas/gafas) + hallazgo de dominio (17-oct)
+
+**Motivación (petición del usuario antes de publicar el Space):** (1) confirmar si los supuestos de las imágenes se validaron alguna vez; (2) los textos de la página se sentían "IA-like" → lenguaje más humano; (3) en una foto de muchachos jugando fútbol se repiten cajas de botas y la de gafas queda muy por encima de los ojos → verificar.
+
+**Hallazgo crítico de seguridad (corregido):** `agente_demo()` usaba `actuadores=[]`, pero el constructor del agente hace `actuadores or [ActuadorConsola(), ActuadorWhatsApp()]` — una lista vacía es falsy → caía a los defaults. Con el `.env` local presente, **el smoke de E40 envió UNA alerta real de WhatsApp** (imagen+caption, wamid en `runs/agente/pruebas_web`... evidencia en consola) — entregada porque la ventana de 24 h estaba abierta (regla E38). En el Space habría sido DRY-RUN (sin .env), pero el diseño era "cero efectos externos". **Fix:** clase `ActuadorNulo` explícita en `deploy/app.py`; re-verificado: procesar un incidente ya NO envía (solo consola/payload DRY-RUN). Lección: `[] or default` es una trampa de Python; los valores "vacíos" no desactivan defaults.
+
+**Verificación botas/gafas (barrido de las 1,413 imágenes, GPU local, seed fija):** scripts en `runs/agente/verificacion_futbol/` (reporte `barrido_completo.json` + copias anotadas de las 104 marcadas). Resultados:
+- **Botas duplicadas (síntoma confirmado):** 9 imágenes con pares de cajas de botas solapadas IoU>0.3 (p. ej. `test/99f7c298…`, `train/ccb5f…`, `train/5507b…`) — el NMS de ultralytics (iou=0.5) deja sobrevivir pares con solape 30–49% sobre el MISMO pie. Es cosmético: `boots` es clase positiva (no alerta); no afecta M1–M4.
+- **Gafas por encima de los ojos (síntoma confirmado, 2 casos claros):** `train/5507b…` gafas cruda 6.3% → re-anclada **3.1%** de la altura de la persona (sobre la frente; ojos reales ≈8%) y `train/d636c…` no_goggle 24% → **5.6%**. Mecanismo: la regla E34 "cabeza descubierta = ojos a la mitad de la caja de no_helmet" falla cuando esa caja no cubre toda la cabeza, y el clamp inferior del 3% permite quedar sobre los ojos. En el resto del dataset el re-anclaje funciona como se diseñó (medianas cruda 15–17% → final 8%).
+- **No se identificó la foto exacta del fútbol:** ninguna imagen marcada combina césped alto + ambos síntomas; si la foto fue subida por el usuario (no es del dataset), queda pendiente que la entregue para analizarla.
+
+**Supuestos de datos (respuesta a (1), con evidencia):** refutado en lo general — el EDA (F1–F10) y E30 validaron sistemáticamente supuestos de etiquetas (formato: 1,129/1,129 sin discrepancias), splits (contaminación F2–F4), balance (F5), anidamiento (F6), geometría/brillo (F7–F9) y anclaje anatómico (E30: 509 cajas, sesgo mediana 14.5% vs 8%). Lo que la sección 8 del EDA ya declaraba NO validado: calidad semántica de anotaciones humanas, near-duplicates y **el supuesto de dominio** ("toda imagen es de obra") — este último es exactamente el que la foto del fútbol refuta (en el dataset hay escenas recreativas con botas etiquetadas en tenis deportivos, p. ej. `test/796b0cda…`: GT 13 Person + 9 boots).
+
+**Textos humanizados (2):** reescritas ~25 cadenas de `deploy/app.py` (encabezado, instrucciones, línea de tiempo, payload, resumen, fallas, progreso de pruebas, veredictos) y el `README.md` del Space: menos negritas/emojis/flechas, español directo. Smoke 3 (funcional + aserciones de textos) pasa.
+
+**Archivos:** `deploy/app.py` (ActuadorNulo + textos), `deploy/README.md` (reescrito), `runs/agente/verificacion_futbol/` (evidencia del barrido). **Pendiente usuario:** decidir si se mitigan los 2 síntomas cosméticos (opciones en conversación: deduplicación de cajas dibujadas / piso del clamp de gafas en ~6%) o se dejan documentados como limitación; y confirmar la foto del fútbol.
+
+---
+
+### E42 — Opción C aplicada: mitigación cosmética botas/gafas + pestaña EDA en la demo + documentación (17-oct)
+
+**Decisión del usuario:** opción C — mitigar los dos síntomas E41 Y documentarlos en la entrega.
+
+**Mitigación (`src/safesite/percepcion.py`, SOLO dibujo):**
+1. **Deduplicación visual E42:** nueva `Percepcion._deduplicar_visual` llamada al inicio de `anotar` — por clase (excepto Persona), conserva la caja de mayor confianza y descarta solapes IoU ≥ 0.3. Causa raíz: el NMS de ultralytics (iou=0.5) deja pasar pares 30–49%.
+2. **Piso del re-anclaje de gafas 3% → 6%** en `_reanclar_a_ojos`: con caja de cabeza incompleta la gafa terminaba sobre la frente (casos E41: 3.1% y 5.6% de la altura de la persona; ojos reales ~8%).
+
+**Validación (script temporal, evidencia en `runs/agente/verificacion_futbol/validacion_e42.json`):**
+- Botas duplicadas: **9/9 casos** con par solapado → **0** tras el fix (boots 2→1 en cada uno).
+- Gafas: **2/2 casos** ahora ≥ 0.060 (antes 0.031 y 0.056).
+- **Suite S1–S13 re-corrída: resultados idénticos en los 13 escenarios** (S1=0, S2=1, S3=3, S4=1, S5=0, S6=1, S7=2, S8=0, S9=0, S10=0, S11=0, S12=1, S13=arranque fallido controlado) — confirma que el fix es estrictamente cosmético (las decisiones usan las detecciones sin deduplicar).
+
+**Pestaña nueva en la demo — "El dataset y el EDA" (`deploy/app.py`):** responde al usuario con la inquietud del docente ("lo más importante es validar supuestos de los datos"). Contiene: qué es el dataset, tabla supuesto→hallazgo→decisión (F1, F2–F4, F5, F6, E30, F8/F9), las limitaciones honestas del EDA (calidad semántica, near-duplicates, supuesto de dominio), el hallazgo E41 de la foto de fútbol con su mitigación E42, y 4 figuras del informe (fig1/fig2/fig3/fig6, incluidas en el Space vía `sincronizar_space.py`). Tono humano (continuidad de E41).
+
+**Documentación de la entrega actualizada:**
+- `Documentation/DESARROLLO_AGENTE.md`: §9.2 filas nuevas (Gradio 6.30.0 y Hugging Face Spaces con justificación frente a alternativas), §9.8.7 limitación de dominio E41/E42, §9.9 enlaces (repo confirmado tras E39 + placeholder del Space).
+- `Documentation/TABLA_CAMBIOS.md`: párrafo "Cambio técnico de visualización (E42)" tras el de E30.
+
+**Archivos:** `src/safesite/percepcion.py` (_deduplicar_visual + clamp 6%), `deploy/app.py` (pestaña EDA), `deploy/sincronizar_space.py` (+eda/figuras), `deploy/README.md` (+pestaña), 2 documentos de la entrega.
+
+---
+
+### E43 — Diagnóstico SOLO-lectura: ¿por qué un pilar rayado se detecta como vest y por qué a veces un solo guante? (17-oct)
+
+**Petición del usuario:** verificar el porqué de dos síntomas, SIN cambiar nada. (Contexto: el usuario está probando la demo con fotos propias — fútbol E41, pilar amarillo/negro — es decir, imágenes fuera del dominio del dataset.)
+
+**Método:** barrido de las 1,413 imágenes con medición geométrica y de color HSV (script temporal; evidencia en `runs/agente/verificacion_percepcion/`): desglose de cada caja `vest` dibujada según si su centro cae en una persona detectada / GT persona / solapa GT vest; firma de color (píxeles amarillo-fluorescente y oscuros) de cada caja; convención de anotación y recall de cajas de `gloves`.
+
+**(a) Pilar → vest:** en val+test el modelo **jamás** dibujó un vest desligado de toda persona (0 casos de 296 cajas dibujadas). En train solo 11 (split memorizado). ⇒ el caso del pilar visto por el usuario proviene de una **foto suya, fuera de distribución** (o de un vest real en persona lejana no detectada como Person: 6 casos en test). Mecanismo confirmado por los datos: las cajas "aisladas" tienen la **misma firma de color que los vests reales** (11% amarillo-fluorescente medio vs 12%; oscuro 18% vs 15%) — la clase `vest` quedó definida por apariencia (amarillo + bandas oscuras) y un pilar con franjas de seguridad comparte esa firma local; un CNN no razona forma/pose. Refuerzo del dato: el **GT mismo contiene 17 cajas de vest sin ninguna persona que las contenga** (2 val, 4 test, 11 train) — el dataset le enseña "cosa amarilla rayada = vest" incluso desligada de personas.
+
+**(b) Un guante sí, el otro no:** NO es convención de anotación (el GT etiqueta 2 guantes en 559 de 681 imágenes con guantes; media GT 2.05). Las causas medidas: (1) **umbral de dibujo 0.35**: el modelo VE las dos manos pero una cae debajo — 54 imágenes con GT≥2, crudo≥2 y solo 1 dibujado; la banda casi-threshold 0.25–0.35 contiene **126 detecciones de guante**; (2) **oclusión real** (mano en bolsillo/herramienta/espalda): 27 imágenes donde el crudo ni siquiera ve la segunda mano; (3) tamaño: las manos están entre los objetos más pequeños del dataset (F7: área mediana de objeto 1.85%). Recall de cajas GT de guante: 89% con conf≥0.15, **80% con conf≥0.35** (dibujadas). Sin impacto en alertas: `gloves` es clase positiva; las alertas salen de `no_gloves` (0.15 + K=3) y el perfil vivo ya cubre el caso asimétrico con la regla de coherencia E35.
+
+**Conclusión de dominio (consistente con E41/E42):** los síntomas del usuario son esperables **fuera de obra**: sesgo de textura en clases definidas por apariencia y umbral/oclusión en objetos pequeños. NO se cambió nada (decisión explícita del usuario). Si entrega la foto del pilar, se puede cuantificar puntualmente.
+
+---
+
+### E44 — Métricas completas (P/R/F1/mAP del detector + accuracy/F1 de escena del agente) y pestaña "EDA y métricas" (17-oct)
+
+**Petición del usuario:** ¿cómo afectan al modelo los hallazgos E43? y ¿qué métricas de accuracy/F1 tiene el agente? → dejarlo documentado en la página, con la sección renombrada "EDA y métricas" y organizada por partes.
+
+**Métricas nuevas calculadas (validación del checkpoint de despliegue sobre dataset_v2, GPU, workers=0 — lección E15):**
+- `eda/salidas/metricas_e44.json` — por clase P/R/F1 (punto de F1 máximo por clase, estándar ultralytics, IoU 0.5, imgsz 640) + AP50 + mAP globales, para val y test; y las de agente a nivel de escena derivadas de la corrida oficial E31.
+- **Detector, val:** mAP50 0.553, P 0.810, R 0.481. F1: helmet 0.807, Person 0.846, vest 0.803, gloves 0.769, goggles 0.794, boots 0.713; **no_***: no_helmet 0.454, no_gloves 0.149, **no_goggle 0.000 (P=1.0, R=0.0), no_boots 0.000 (AP50 0.005)**.
+- **Detector, test:** mAP50 0.523, P 0.611, R 0.504. F1: helmet 0.881, Person 0.746, vest 0.797, gloves 0.781; **no_***: no_helmet 0.231, no_goggle 0.160, no_gloves 0.180, no_boots 0.000 (AP50 0.017).
+- **Agente (escena, desde E31):** val TP=27 FN=1 FP=4 TN=111 → **accuracy 0.965, precisión 0.871, recall 0.964, F1 0.915**; test TP=25 FN=1 FP=3 TN=111 → **accuracy 0.971, precisión 0.893, recall 0.962, F1 0.926**.
+- **El contraste es la tesis del proyecto:** F1 de caja casi nulo en `no_goggle`/`no_boots` vs F1 de escena 0.92 — la arquitectura (umbral 0.15 + K=3 + solo clases `no_*`) compensa la debilidad del detector; exactamente la apuesta que salió del hallazgo F5. También explica E43: los fallos que el usuario ve (pilar-vest, un guante) viven en las clases positivas/débis del nivel caja y no tocan las métricas de negocio.
+- Nota metodológica agregada: la "accuracy" de clasificación no es informativa en detección (multi-etiqueta + fondo trivial); se documenta por qué se usan P/R/F1/mAP por clase y la accuracy a nivel de ESCENA del agente.
+
+**Página:** pestaña renombrada **"EDA y métricas"** con 4 secciones plegables: (1) dataset + supuestos validados (tabla + 4 figuras), (2) lo no validado + hallazgo del dominio, (3) métricas del detector por clase (val y test), (4) métricas del agente (tabla TP/FN/FP/TN + M1–M4 oficiales + lectura del contraste). Datos leídos de `metricas_e44.json` (no hardcodeados). `sincronizar_space.py` ahora incluye `eda/salidas/metricas_e44.json`; README del Space actualizado.
+
+**Archivos:** `eda/salidas/metricas_e44.json` (nuevo), `deploy/app.py`, `deploy/sincronizar_space.py`, `deploy/README.md`. La validación ultralytics dejó curvas/matrices en `runs/safesite/tuned_v2_s/val_v2_{val,test}/` (evidencia reproducible).
+
+---
+
+### E45 — Poda exhaustiva de textos de la página + temas de color seleccionables (18-oct)
+
+**Petición del usuario:** revisar la página porque "hay mucho texto que no dice nada"; dejar solo lo importante, asumiendo un lector que no sabe nada; y mejorar el color (el negro del modo oscuro resulta intrusivo, probar opciones).
+
+**Criterio de la poda:** cada texto que quedaba tenía que ganar su lugar explicando algo que un novatio necesita (qué hace el agente, cómo usar una pestaña, cómo leer una tabla). Se eliminaron: reaseguraciones repetidas (el "no se envía nada" aparecía 4 veces, quedó 1), jerga interna sin contexto para un externo (referencias E24/E28/E31/S9-S13, "la misma simulación que la suite oficial", "2 fps", "mAP50-95" en pantalla), y estadísticas de proceso que no ayudan al lector (conteo de escenas en cada foto sorteada, la primera corrida 165621, "sin cambios"). Smoke con aserciones de presencia/ausencia: **12 textos de relleno fuera, 5 textos clave dentro, sin traceback**.
+
+**Textos nuevos clave (ejemplos):** encabezado reducido a una sola idea ("revisa imágenes buscando trabajadores sin EPP; falta confirmada = aparece en 3 frames seguidos; el mensaje solo se muestra"); la regla de escena de la sección 4 ahora define TP/FN/FP con una línea cada uno; la explicación de "¿y la accuracy?" bajó de 6 a 4 líneas; el caso del fútbol quedó en un párrafo.
+
+**Temas (E45):** `_tema()` en `app.py` con selector por variable de entorno `SAFESITE_TEMA`: **esmeralda** (default: Soft con primario emerald y neutral stone), **ambar**, **azul**, **grafito** (Soft), **ocean** y **neon** (temas incluidos en Gradio 6.30). El neutral `stone` hace que el modo oscuro sea grafito cálido en vez de negro puro — la queja del usuario. Smoke: los 6 temas construyen sin error.
+
+**Archivos:** `deploy/app.py` (~25 textos podados + `_tema()` + `gr.Blocks(theme=...)`), `deploy/README.md` (también podado). Smoke temporal en la carpeta de sistema.
+
+---
+
+### E46 — Fallas visibles en la demo, semilla configurable, tests del núcleo con CI y comentarios más naturales (18-oct)
+
+**Petición del usuario (4 partes):** (1) las fallas simuladas eran solo texto — mostrar un fallo real; (2) el sorteo de fotos traía siempre las mismas por la semilla fija — poder variarla; (3) tests con un workflow de GitHub Actions "simple pero que respalde la calidad"; (4) humanizar comentarios del código sin eliminarlos. Todo termina en commit.
+
+**(1) Fallas visibles:** `simular_falla` ahora devuelve el frame tal como llegó al agente (canvas con el frame negro, el gris de 1 canal convertido a color, o un lienzo "SIN DATO" para None) más una tabla con la reacción frame por frame ("percepción fallida registrada" ×4, o "sin detecciones" para el negro). El botón actualiza también la imagen de salida, no solo el log. El frame gris pasó de ceros a gris 128 para que se vea como señal degradada.
+
+**(2) Semilla configurable:** campo numérico "Semilla del sorteo" junto al botón; cada sesión arranca con una semilla aleatoria (1–9,999) y la foto sorteada muestra "Semilla X, sorteo N". Mismo número → mismo orden de fotos (reproducible); cambiarlo → otras fotos. Implementación: `random.Random(f"{seed}-{n}")` por sorteo; el `_rng` global fijo se eliminó. Smoke: misma semilla + sorteo 1 = misma foto; sorteo 2 avanza; semilla distinta = foto distinta.
+
+**(3) Tests + CI:** `tests/test_nucleo.py` — 13 pruebas de la lógica sin modelo ni dataset (la percepción va falsificada): confirmación exacta en K frames, no confirmación antes, racha se rompe, umbrales por clase (0.15/0.35 en el borde), regla de coherencia, cooldown bloquea/deja pasar, contención de persona, piso del re-anclaje de gafas (≥6%), deduplicación visual, frames inválidos sin caída, ciclo completo confirma y no repite alerta, frame sin faltas no alerta, y los umbrales pre-registrados de la suite donde deben estar. **13 passed en 0.28 s** con el venv (pytest instalado en el venv). Workflow `.github/workflows/tests.yml`: ubuntu + Python 3.12 + numpy/opencv-headless/pytest, `python -m pytest tests -q` en cada push/pull_request (~1 min; no instala torch porque no hace falta).
+
+**(4) Comentarios:** reescritos los docstrings y comentarios marcados de `deploy/app.py` (encabezado de 39 líneas → 15, ActuadorNulo, banners de sección, suite, tema), `deploy/sincronizar_space.py`, y los añadidos recientes de `percepcion.py` (clamp y dedup) y `config.py` (rutas): sin referencias internas tipo "E4x", sin MAYÚSCULAS de énfasis, menos estructura de lista en los docstrings; el tono es el de un dev anotando decisiones. La bitácora conserva el registro completo de todo el proceso.
+
+**Archivos:** `deploy/app.py` (falla visual + semilla + comentarios), `tests/test_nucleo.py` y `.github/workflows/tests.yml` (nuevos), `.gitignore` (+`.pytest_cache/`), comentarios en `src/safesite/percepcion.py` y `config.py`. Smokes E46: semilla y falla verificados; UI construye. **Commit y push incluidos en esta ejecución.**
+
+---
+
 ## 📊 Tabla resumen del EDA (para evaluación rápida)
 
 | Indicador | Valor | Estado |

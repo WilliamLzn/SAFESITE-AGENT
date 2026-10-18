@@ -169,10 +169,12 @@ class Percepcion:
                     objetivo = casco.caja[3] + 0.20 * h
         else:
             objetivo = py1 + config.FRACCION_OJOS * ph
-        # clamp anatomico: ojos dentro [3%, 45%] de la altura de la persona
-        # (en primer plano cabeza+torso los ojos quedan ~38-40%; en
-        # full-body ~8%; 45% evita arrastrar una caja al pecho)
-        objetivo = min(max(objetivo, py1 + 0.03 * ph), py1 + 0.45 * ph)
+        # clamp anatomico: los ojos quedan entre el 6% y el 45% de la
+        # altura de la persona (en primer plano estan por el 38-40%, en
+        # plano general por el 8%). El piso es 6% y no 3% para que una
+        # caja de cabeza incompleta no arrastre la gafa por encima de la
+        # frente, cosa que se veia en un par de fotos del dataset.
+        objetivo = min(max(objetivo, py1 + 0.06 * ph), py1 + 0.45 * ph)
         # y sin salir por arriba de la persona
         objetivo = max(objetivo, py1 + h / 2 + 2)
         if cy <= objetivo + 0.25 * h:
@@ -192,6 +194,40 @@ class Percepcion:
                     cv2.FONT_HERSHEY_SIMPLEX, escala, (255, 255, 255), grosor)
 
     @staticmethod
+    def _deduplicar_visual(detecciones, iou_umbral=0.3):
+        """Al dibujar, no repite cajas de una misma clase que estén muy
+        solapadas (se queda con la de mayor confianza).
+
+        El motivo: el NMS de la librería deja pasar pares con 30-49% de
+        solape, y eso hacía que se vieran dos cajas de botas sobre el
+        mismo pie. Persona no se deduplica porque en escenas amontonadas
+        dos personas distintas pueden solapar sus cajas sin ser
+        duplicados.
+
+        Ojo: esto solo cambia el dibujo. Las decisiones y las métricas
+        usan la lista original sin filtrar."""
+        conservadas, por_clase = [], {}
+        for d in sorted(detecciones, key=lambda x: -x.conf):
+            if d.cls_id == 6:                      # Persona: sin dedup
+                conservadas.append(d)
+                continue
+            duplicado = False
+            for otra in por_clase.get(d.cls_id, []):
+                a, b = d.caja, otra.caja
+                ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+                iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+                inter = ix * iy
+                un = ((a[2] - a[0]) * (a[3] - a[1])
+                      + (b[2] - b[0]) * (b[3] - b[1]) - inter)
+                if un > 0 and inter / un >= iou_umbral:
+                    duplicado = True
+                    break
+            if not duplicado:
+                por_clase.setdefault(d.cls_id, []).append(d)
+                conservadas.append(d)
+        return conservadas
+
+    @staticmethod
     def anotar(frame, detecciones, grueso=2):
         """Dibuja las detecciones con anclaje anatomico y etiquetas legibles.
 
@@ -200,9 +236,12 @@ class Percepcion:
         - etiquetas en espanol con fondo solido (legibles en video);
         - `goggles`/`no_goggle` se re-anclan a nivel de ojos de la persona
           que las contiene (E30: el dataset fuente las etiqueta por debajo
-          de la cara; ver config y BITACORA).
+          de la cara; ver config y BITACORA);
+        - cajas de la misma clase muy solapadas no se dibujan dos veces
+          (solo presentación, ver `_deduplicar_visual`).
         """
         anotado = frame.copy()
+        detecciones = Percepcion._deduplicar_visual(detecciones)
         personas = [d for d in detecciones if d.cls_id == 6]
         cascos = [d for d in detecciones if d.cls_id in (0, 7)]
         # 1) personas primero (las cajas de EPP van encima)

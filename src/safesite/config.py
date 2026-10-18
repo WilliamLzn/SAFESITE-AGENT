@@ -13,7 +13,8 @@ Valores por defecto derivados de la evidencia:
 # --- Modelo (checkpoint de DESPLIEGUE, elegido en P8/BITACORA E23) ---
 # tuned_v2_s (yolov8s, data v3): recall incidente no_helmet 0.963 val / 0.833 test
 # vs baseline_v1 (yolov8n, data v2): 0.778 / 0.792. Ver eda/salidas/resumen_fase3_demo*.json
-RUTA_MODELO = r"runs\safesite\tuned_v2_s\weights\best.pt"
+# rutas con '/' para que funcionen igual en Windows y en el Space de Linux
+RUTA_MODELO = "runs/safesite/tuned_v2_s/weights/best.pt"
 DEVICE_DEFECTO = "cpu"  # el demo corre en CPU para no competir con entrenamientos en GPU
 
 # --- Clases (orden = dataset.yaml) ---
@@ -92,6 +93,6 @@ MAX_MENSAJES_HORA = 20      # techo de mensajes en una hora rodante
 # bypassan estos limites: son peticiones explicitas del supervisor.
 
 # --- Salidas del agente (artefactos de ejecucion, no versionados) ---
-DIR_SALIDAS_AGENTE = r"runs\agente"
-DIR_ALERTAS = r"runs\agente\alertas"        # frames anotados de incidentes confirmados
-ARCHIVO_HISTORIAL = r"runs\agente\historial_incidentes.jsonl"
+DIR_SALIDAS_AGENTE = "runs/agente"
+DIR_ALERTAS = "runs/agente/alertas"          # frames anotados de incidentes confirmados
+ARCHIVO_HISTORIAL = "runs/agente/historial_incidentes.jsonl"

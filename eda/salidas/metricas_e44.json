@@ -1,0 +1,233 @@
+{
+  "modelo": "tuned_v2_s (yolov8s, best.pt)",
+  "splits": {
+    "val": {
+      "n_imagenes": null,
+      "mAP50": 0.5529,
+      "mAP50-95": 0.2668,
+      "precision_media": 0.81,
+      "recall_media": 0.4814,
+      "por_clase": [
+        {
+          "id": 0,
+          "clase": "helmet",
+          "P": 0.803,
+          "R": 0.811,
+          "F1": 0.807,
+          "AP50": 0.819
+        },
+        {
+          "id": 1,
+          "clase": "gloves",
+          "P": 0.879,
+          "R": 0.684,
+          "F1": 0.769,
+          "AP50": 0.789
+        },
+        {
+          "id": 2,
+          "clase": "vest",
+          "P": 0.836,
+          "R": 0.773,
+          "F1": 0.803,
+          "AP50": 0.825
+        },
+        {
+          "id": 3,
+          "clase": "boots",
+          "P": 0.902,
+          "R": 0.589,
+          "F1": 0.713,
+          "AP50": 0.777
+        },
+        {
+          "id": 4,
+          "clase": "goggles",
+          "P": 0.913,
+          "R": 0.702,
+          "F1": 0.794,
+          "AP50": 0.787
+        },
+        {
+          "id": 5,
+          "clase": "none",
+          "P": 0.661,
+          "R": 0.433,
+          "F1": 0.523,
+          "AP50": 0.446
+        },
+        {
+          "id": 6,
+          "clase": "Person",
+          "P": 0.834,
+          "R": 0.858,
+          "F1": 0.846,
+          "AP50": 0.895
+        },
+        {
+          "id": 7,
+          "clase": "no_helmet",
+          "P": 0.629,
+          "R": 0.356,
+          "F1": 0.454,
+          "AP50": 0.453
+        },
+        {
+          "id": 8,
+          "clase": "no_goggle",
+          "P": 1.0,
+          "R": 0.0,
+          "F1": 0.0,
+          "AP50": 0.103
+        },
+        {
+          "id": 9,
+          "clase": "no_gloves",
+          "P": 0.454,
+          "R": 0.089,
+          "F1": 0.149,
+          "AP50": 0.183
+        },
+        {
+          "id": 10,
+          "clase": "no_boots",
+          "P": 1.0,
+          "R": 0.0,
+          "F1": 0.0,
+          "AP50": 0.005
+        }
+      ]
+    },
+    "test": {
+      "n_imagenes": null,
+      "mAP50": 0.5226,
+      "mAP50-95": 0.2563,
+      "precision_media": 0.6108,
+      "recall_media": 0.5039,
+      "por_clase": [
+        {
+          "id": 0,
+          "clase": "helmet",
+          "P": 0.852,
+          "R": 0.911,
+          "F1": 0.881,
+          "AP50": 0.925
+        },
+        {
+          "id": 1,
+          "clase": "gloves",
+          "P": 0.844,
+          "R": 0.727,
+          "F1": 0.781,
+          "AP50": 0.764
+        },
+        {
+          "id": 2,
+          "clase": "vest",
+          "P": 0.739,
+          "R": 0.864,
+          "F1": 0.797,
+          "AP50": 0.868
+        },
+        {
+          "id": 3,
+          "clase": "boots",
+          "P": 0.818,
+          "R": 0.647,
+          "F1": 0.723,
+          "AP50": 0.741
+        },
+        {
+          "id": 4,
+          "clase": "goggles",
+          "P": 0.717,
+          "R": 0.75,
+          "F1": 0.733,
+          "AP50": 0.771
+        },
+        {
+          "id": 5,
+          "clase": "none",
+          "P": 0.435,
+          "R": 0.415,
+          "F1": 0.425,
+          "AP50": 0.327
+        },
+        {
+          "id": 6,
+          "clase": "Person",
+          "P": 0.683,
+          "R": 0.821,
+          "F1": 0.746,
+          "AP50": 0.806
+        },
+        {
+          "id": 7,
+          "clase": "no_helmet",
+          "P": 0.274,
+          "R": 0.2,
+          "F1": 0.231,
+          "AP50": 0.176
+        },
+        {
+          "id": 8,
+          "clase": "no_goggle",
+          "P": 1.0,
+          "R": 0.087,
+          "F1": 0.16,
+          "AP50": 0.212
+        },
+        {
+          "id": 9,
+          "clase": "no_gloves",
+          "P": 0.356,
+          "R": 0.121,
+          "F1": 0.18,
+          "AP50": 0.143
+        },
+        {
+          "id": 10,
+          "clase": "no_boots",
+          "P": 0.0,
+          "R": 0.0,
+          "F1": 0.0,
+          "AP50": 0.017
+        }
+      ]
+    }
+  },
+  "agente_escena": {
+    "val": {
+      "escenas_incidente": 28,
+      "escenas_control": 115,
+      "TP": 27,
+      "FN": 1,
+      "FP": 4,
+      "TN": 111,
+      "accuracy_escena": 0.965,
+      "precision_escena": 0.871,
+      "recall_escena_M1": 0.964,
+      "f1_escena": 0.915,
+      "falsas_M2": 0.035
+    },
+    "test": {
+      "escenas_incidente": 26,
+      "escenas_control": 114,
+      "TP": 25,
+      "FN": 1,
+      "FP": 3,
+      "TN": 111,
+      "accuracy_escena": 0.971,
+      "precision_escena": 0.893,
+      "recall_escena_M1": 0.962,
+      "f1_escena": 0.926,
+      "falsas_M2": 0.026
+    }
+  },
+  "agente_M3_M4": {
+    "M3_t_total_s": 2.99,
+    "M3_umbral_s": 10.0,
+    "M4_cumple": true
+  },
+  "nota": "P/R/F1 por clase en el punto de maxima F1 de cada clase (reporte estandar de ultralytics, IoU 0.5, imgsz 640). Las metricas del agente son a NIVEL DE ESCENA con los umbrales de operacion reales (no_* 0.15, K=3) de la corrida oficial E31 (5 repeticiones, GPU, 14-oct-2026)."
+}
