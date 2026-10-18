@@ -4,9 +4,9 @@ La página ejecuta el agente de verdad, en el momento: no hay resultados
 guardados ni capturas pregrabadas. Todo pasa por el mismo código del
 repositorio (src/safesite).
 
-Pestañas: demo en vivo (webcam, imágenes propias o fotos del set de test,
-con simulación de fallas del sensor), la suite de pruebas corriendo en el
-navegador, los resultados oficiales, el EDA con las métricas y las
+Pestañas: demo en vivo (webcam, imágenes propias o fotos del set de test),
+las fallas del sensor en una pestaña propia, la suite de pruebas corriendo
+en el navegador, los resultados oficiales, el EDA con las métricas y las
 instrucciones.
 
 Detalles de despliegue que conviene conocer:
@@ -14,9 +14,12 @@ Detalles de despliegue que conviene conocer:
   de WhatsApp solo construye el mensaje para mostrarlo.
 - El repo del Space es un espejo de la raíz del proyecto, y por eso las
   rutas de src/safesite, dataset_v2 y runs funcionan sin tocar nada.
+- El color se elige al arrancar: --tema grafito, --tema rosa, o la
+  variable SAFESITE_TEMA. Por defecto es esmeralda.
 
 Para probarla local, desde la raíz del repo:
     .venv\\Scripts\\python.exe deploy\\app.py     -> http://localhost:7860
+    .venv\\Scripts\\python.exe deploy\\app.py --tema grafito
 """
 import json
 import os
@@ -199,10 +202,11 @@ def verificar(img_rgb, zona, gt, ses):
                "log": []}
     if img_rgb is None:
         _log_linea(ses, "procesar sin imagen: se ignoró")
+        resumen = _resumen_md(zona, ses)
+        log = "\n".join(ses["log"][-25:])
         return (None, "Todavía no hay imagen. Toma una foto con la webcam, "
                 "sube un archivo o trae una del set de test.",
-                [], _payload_md([]), _resumen_md(zona, ses),
-                "\n".join(ses["log"][-25:]), ses)
+                [], _payload_md([]), resumen, resumen, log, log, ses)
 
     frame = cv2.cvtColor(np.asarray(img_rgb), cv2.COLOR_RGB2BGR)
     ag = agente_demo()
@@ -252,9 +256,12 @@ def verificar(img_rgb, zona, gt, ses):
                     f"→ {len(incidentes_totales)} incidente(s): "
                     f"{', '.join(i.clase for i in incidentes_totales) or 'ninguno'}")
 
+    # resumen y bitácora van a las dos pestañas (demo y fallas) porque es
+    # la misma sesión de trabajo
+    resumen = _resumen_md(zona, ses)
+    log = "\n".join(ses["log"][-25:])
     return (anotado_rgb, decisiones_md, _tabla_detecciones(filtradas_ultimo),
-            _payload_md(incidentes_totales), _resumen_md(zona, ses),
-            "\n".join(ses["log"][-25:]), ses)
+            _payload_md(incidentes_totales), resumen, resumen, log, log, ses)
 
 
 def _resumen_md(zona, ses):
@@ -313,7 +320,8 @@ def foto_aleatoria(seed, ses):
                 f"debería quedarse callado." + seed_nota)
     log = _log_linea(ses, f"foto sorteada (semilla {ses['seed']}, "
                           f"n.{ses['sorteos']}): {gt['ruta']} (tipo {tipo})")
-    return cv2.cvtColor(cv2.imread(ruta), cv2.COLOR_BGR2RGB), info, gt, log, ses
+    return (cv2.cvtColor(cv2.imread(ruta), cv2.COLOR_BGR2RGB), info, gt,
+            log, log, ses)
 
 
 FALLAS = {
@@ -377,7 +385,9 @@ def simular_falla(opcion, zona, ses):
               "inventó alertas.")
     log = _log_linea(ses, f"falla simulada ({FALLAS[opcion][0]}) -> "
                           f"frames fallidos +{delta}")
-    return canvas, md, _resumen_md(zona, ses), log, ses
+    # resumen y bitácora a las dos pestañas: es la misma sesión
+    resumen = _resumen_md(zona, ses)
+    return canvas, md, resumen, resumen, log, log, ses
 
 
 # --- pruebas en vivo: la suite del proyecto corriendo en el navegador ---
@@ -613,8 +623,8 @@ def _tabla_detector(metricas, split):
 # --- la interfaz ---
 
 def _tema():
-    """Tema de la página. Se cambia con SAFESITE_TEMA=<nombre>:
-    esmeralda (por defecto) | ambar | azul | grafito | ocean | neon.
+    """Tema de la página. Se elige con --tema o con SAFESITE_TEMA:
+    esmeralda (por defecto) | grafito | rosa | ambar | azul | ocean | neon.
     El neutral 'stone' hace que el modo oscuro sea un grafito cálido
     en vez de negro puro."""
     nombre = os.environ.get("SAFESITE_TEMA", "esmeralda").lower()
@@ -623,7 +633,8 @@ def _tema():
     if nombre == "neon":
         return gr.themes.Neon()
     hues = {"esmeralda": ("emerald", "stone"), "ambar": ("amber", "stone"),
-            "azul": ("blue", "slate"), "grafito": ("stone", "stone")}
+            "azul": ("blue", "slate"), "grafito": ("stone", "stone"),
+            "rosa": ("rose", "stone")}
     primario, neutral = hues.get(nombre, hues["esmeralda"])
     return gr.themes.Soft(primary_hue=primario, neutral_hue=neutral)
 
@@ -665,14 +676,6 @@ def construir_ui():
                     gt_md = gr.Markdown("")
                     btn_ver = gr.Button("Procesar esta imagen",
                                         variant="primary")
-                    gr.Markdown("---")
-                    gr.Markdown("Caso de falla (sensor sin dato o entrada "
-                                "inválida — lo pide el enunciado)")
-                    radio_falla = gr.Radio(
-                        choices=list(ETIQUETA_A_CLAVE.keys()),
-                        value=FALLAS["none"][0],
-                        label="Tipo de falla a simular")
-                    btn_falla = gr.Button("Simular la falla")
                 with gr.Column(scale=1):
                     img_out = gr.Image(label="La misma imagen, con las "
                                        "detecciones dibujadas", type="numpy")
@@ -694,7 +697,36 @@ def construir_ui():
                                         "procesó y qué decidió, con hora)",
                                      lines=8, interactive=False)
 
-        # ---------------- pestana 2: pruebas en vivo ----------------
+        # ---------------- pestana 2: fallas del sensor ----------------
+        with gr.Tab("Fallas del sensor"):
+            gr.Markdown(
+                "Las cámaras fallan: dejan de entregar datos, mandan basura "
+                "o un frame sin contenido. Lo correcto para un agente que "
+                "vigila una obra es registrar la falla y seguir en pie, sin "
+                "caerse y sin inventar alertas. Elige un caso y mira la "
+                "reacción, frame por frame. El frame negro no es una falla: "
+                "es una imagen válida (sin señal de contenido) que el agente "
+                "mira y de la que no saca nada.")
+            with gr.Row():
+                with gr.Column(scale=2):
+                    radio_falla = gr.Radio(
+                        choices=list(ETIQUETA_A_CLAVE.keys()),
+                        value=FALLAS["none"][0],
+                        label="Tipo de falla a simular")
+                    btn_falla = gr.Button("Simular la falla",
+                                          variant="primary")
+                    resumen_falla_md = gr.Markdown("")
+                with gr.Column(scale=3):
+                    img_falla_out = gr.Image(
+                        label="Lo que le llegó al agente", type="numpy")
+                    md_falla = gr.Markdown(
+                        "Simula una falla para ver qué recibió el agente y "
+                        "qué decidió con cada frame.")
+            log_falla_txt = gr.Textbox(
+                label="Bitácora de la sesión (compartida con la demo)",
+                lines=8, interactive=False)
+
+        # ---------------- pestana 3: pruebas en vivo ----------------
         with gr.Tab("Pruebas (M1–M4)"):
             gr.Markdown(
                 "Aquí corre en vivo la misma suite de pruebas del proyecto "
@@ -702,6 +734,42 @@ def construir_ui():
                 "apareciendo mientras se ejecuta y al final puedes descargar "
                 "el log frame por frame y los resultados (CSV/JSON), en el "
                 "formato de la entrega.\n\n"
+                "**Qué son las medidas M1–M4.** Son los cuatro compromisos "
+                "numéricos que el proyecto se fijó *antes* de construir el "
+                "agente (la M es de «medida»). Fijarlas antes es lo que "
+                "hace honesta la evaluación: la meta no se movió después "
+                "de ver los resultados.\n\n"
+                "| Medida | Qué mide | Cómo se calcula | Objetivo |\n"
+                "|---|---|---|---|\n"
+                "| **M1** Recall de incidente | de las escenas que SÍ "
+                "tienen una falta, en cuántas el agente alerta | escenas "
+                "con alerta / escenas con falta | ≥ 0.70 |\n"
+                "| **M2** Falsas alarmas | de las escenas SIN falta, en "
+                "cuántas el agente alerta igual | escenas control "
+                "alertadas / escenas control | ≤ 0.10 |\n"
+                "| **M3** Tiempo de notificación | cuánto tarda el aviso "
+                "en llegar al supervisor | confirmación (3 frames) + "
+                "procesamiento + envío a WhatsApp | < 10 s |\n"
+                "| **M4** Cooldown anti-spam | que no repita la misma "
+                "alerta dentro de la ventana de 30 s | alertas duplicadas "
+                "en la ventana | 0 |\n\n"
+                "**Cómo leer la tabla de escenarios.** El primer botón "
+                "corre los 13 escenarios (S1–S13): «normal» es el caso "
+                "típico, «límite» empuja los bordes del diseño (persona "
+                "lejana, reincidencia) y «falla» mete entradas rotas "
+                "donde lo correcto es degradarse sin caerse. En cada "
+                "fila, «Alertas (media±σ)» es el promedio de las 5 "
+                "repeticiones (un σ de 0.0 no es raro: con el mismo "
+                "equipo la detección es determinista), «t_alerta s» es "
+                "el tiempo simulado hasta el aviso, y «Excepciones» "
+                "cuenta los errores no controlados: debe ser 0. El "
+                "veredicto final agrega M3 y M4; M4 se comprueba con "
+                "S6 y S7 (la misma reincidencia dentro de la ventana "
+                "de cooldown da 1 sola alerta; después de la ventana, "
+                "2).\n\n"
+                "El segundo botón mide **M1 y M2** sobre todas las "
+                "escenas de val y test (283 en total): la evaluación "
+                "completa del objetivo de negocio.\n\n"
                 "Tiempos aproximados: los 13 escenarios, entre 2 y 5 "
                 "minutos; los M1 y M2 sobre todas las escenas, entre 15 y "
                 "30 minutos. Puedes usar las otras pestañas mientras corre.")
@@ -729,14 +797,36 @@ def construir_ui():
                 json_a = gr.File(label="Resultados M1/M2 (JSON)")
                 log_a = gr.File(label="Log M1/M2 frame por frame (JSONL)")
 
-        # ---------------- pestana 3: resultados oficiales ----------------
+        # ---------------- pestana 4: resultados oficiales ----------------
         with gr.Tab("Resultados oficiales"):
             gr.Markdown(
                 f"Corrida oficial de la suite, hecha en el equipo local con "
                 f"GPU y 5 repeticiones (14 de octubre de 2026): "
                 f"`resultados_{CORRIDA_OFICIAL}`. Si corres las pruebas de "
                 f"la pestaña anterior, los números deben coincidir con "
-                f"estos.")
+                f"estos.\n\n"
+                f"**Cómo leer estas dos tablas.** La primera es el "
+                f"veredicto: cada fila es una medida (M1–M4) en su split. "
+                f"«Fórmula» recuerda cómo se calcula, «Umbral» es el "
+                f"objetivo fijado antes de construir el agente y "
+                f"«¿Cumple?» compara el resultado contra ese objetivo. El "
+                f"«± 0.0» no es sospechoso: en un mismo equipo la corrida "
+                f"es determinista y las 5 repeticiones dan exactamente "
+                f"igual.\n\n"
+                f"La segunda es el detalle, escenario por escenario "
+                f"(S1–S13). «normal» = el caso típico; «límite» = casos que "
+                f"empujan los bordes del diseño (persona lejana, "
+                f"reincidencia dentro y fuera de la ventana de cooldown); "
+                f"«falla» = entradas rotas (sensor sin dato, API de "
+                f"WhatsApp caída, checkpoint inexistente) donde lo correcto "
+                f"es fallar de forma controlada, sin caerse. En cada fila, "
+                f"«Alertas (media±σ)» es el promedio de las repeticiones y "
+                f"«t_alerta s» el tiempo simulado hasta el aviso; "
+                f"«None» en esa columna significa que el escenario no "
+                f"debía alertar y no alertó. Fíjate en S6 y S7: son la "
+                f"evidencia de M4 — la reincidencia dentro de la ventana "
+                f"de 30 s produce una sola alerta y, pasada la ventana, "
+                f"dos.")
             gr.Markdown(tabla_oficial)
             if json_oficial:
                 with gr.Accordion("JSON completo de la corrida oficial",
@@ -753,7 +843,7 @@ def construir_ui():
                 gr.File(value=os.path.join(base, f"tabla_resultados_{CORRIDA_OFICIAL}.md"),
                         label="Tabla oficial (Markdown)")
 
-        # ---------------- pestana 4: EDA y metricas ----------------
+        # ---------------- pestana 5: EDA y metricas ----------------
         with gr.Tab("EDA y métricas"):
             figuras = os.path.join(RAIZ, "eda", "figuras")
             metricas = _cargar_metricas()
@@ -802,38 +892,116 @@ def construir_ui():
                     "es de 640×640 y el 4.5% de la muestra es muy oscura | La "
                     "inferencia se mantiene en 640 o más; el aumento de datos "
                     "nocturno queda como recomendación para cámaras 24/7 |")
+                # Las 6 figuras que genera el EDA (eda/04_figuras.py),
+                # cada una con su lectura: qué muestra y por qué está aquí
                 with gr.Row():
-                    gr.Image(value=os.path.join(figuras, "fig1_clases.png"),
-                             label="Distribución de clases: las faltas no_* "
-                                   "son minoría")
-                    gr.Image(value=os.path.join(figuras, "fig3_splits.png"),
-                             label="La contaminación de splits que obligó a "
-                                   "rehacerlos")
+                    with gr.Column():
+                        gr.Image(value=os.path.join(figuras,
+                                    "fig1_clases.png"),
+                                 label="Distribución de clases: las faltas "
+                                       "no_* son minoría")
+                        gr.Markdown(
+                            "*Cajas por clase en el dataset completo "
+                            "(11,521). Las barras rojas son las faltas "
+                            "`no_*` que el agente debe detectar: apenas el "
+                            "13.6% del total, y `no_boots` (115 cajas, 1%) "
+                            "casi no se distingue. Es la evidencia detrás "
+                            "de los umbrales bajos y de medir el éxito por "
+                            "escena y no por caja.*")
+                    with gr.Column():
+                        gr.Image(value=os.path.join(figuras,
+                                    "fig2_cajas_por_imagen.png"),
+                                 label="Cajas por imagen: escenas densas")
+                        gr.Markdown(
+                            "*Objetos etiquetados por imagen: mediana de 7, "
+                            "máximo de 58. En una obra hay varias personas "
+                            "a la vez, así que el agente no puede razonar "
+                            "sobre «la foto» en bloque: decide detección "
+                            "por detección.*")
                 with gr.Row():
-                    gr.Image(value=os.path.join(figuras,
-                                                "fig2_cajas_por_imagen.png"),
-                             label="Cajas por imagen: escenas densas")
-                    gr.Image(value=os.path.join(figuras, "fig6_brillo.png"),
-                             label="Brillo: el 4.5% de la muestra es muy "
-                                   "oscura")
-            with gr.Accordion("2. Lo que no se pudo validar (y la foto del "
-                              "fútbol)", open=False):
+                    with gr.Column():
+                        gr.Image(value=os.path.join(figuras,
+                                    "fig3_splits.png"),
+                                 label="La contaminación de splits que "
+                                       "obligó a rehacerlos")
+                        gr.Markdown(
+                            "*Cruce entre las carpetas del proyecto y el "
+                            "split oficial del dataset: 112 imágenes que "
+                            "el oficial reservaba para test estaban "
+                            "dentro de train. Entrenar con ellas infla "
+                            "cualquier métrica; por eso el primer paso "
+                            "del proyecto fue rehacer el split "
+                            "(`dataset_v2`) antes de entrenar.*")
+                    with gr.Column():
+                        gr.Image(value=os.path.join(figuras,
+                                    "fig4_areas.png"),
+                                 label="Área de las cajas: objetos pequeños")
+                        gr.Markdown(
+                            "*Área que ocupa cada caja respecto a la imagen "
+                            "(mediana 1.85%, escala logarítmica). En planos "
+                            "abiertos los EPP son pocos píxeles, y los que "
+                            "menos alcanzan a ver son justamente los más "
+                            "pequeños del cuerpo — botas y gafas. Es la "
+                            "causa geométrica del mal resultado del "
+                            "detector en `no_boots` y `no_goggle` (ver la "
+                            "sección 3).*")
+                with gr.Row():
+                    with gr.Column():
+                        gr.Image(value=os.path.join(figuras,
+                                    "fig5_dimensiones.png"),
+                                 label="Resoluciones: no todo es 640×640")
+                        gr.Markdown(
+                            "*Resoluciones en disco: 78.8% son 640×640 y el "
+                            "21.2% restante no, mezclando horizontal y "
+                            "vertical. YOLO re-escala todo (letterbox), "
+                            "pero explica por qué la resolución de "
+                            "inferencia se mantiene en 640 o más: "
+                            "achicar la imagen castiga primero a los "
+                            "objetos pequeños de la figura anterior.*")
+                    with gr.Column():
+                        gr.Image(value=os.path.join(figuras,
+                                    "fig6_brillo.png"),
+                                 label="Brillo: el 4.5% de la muestra es "
+                                       "muy oscura")
+                        gr.Markdown(
+                            "*Brillo medio de una muestra determinista "
+                            "(n=200, semilla 42; la línea roja marca el "
+                            "umbral de «oscuro»). 9 imágenes (4.5%) caen "
+                            "por debajo: hay condiciones de noche e "
+                            "interior en el dataset. Para una cámara 24/7 "
+                            "esto pesa más: de noche el detector ve menos, "
+                            "y el aumento de datos nocturno quedó como "
+                            "mejora futura.*")
+            with gr.Accordion("2. Límites de la validación: lo que quedó "
+                              "sin comprobar", open=False):
                 gr.Markdown(
-                    "Tres supuestos quedaron sin verificar, y así quedó "
-                    "escrito en el informe: la calidad de las etiquetas "
-                    "hechas por humanos, posibles imágenes casi duplicadas "
-                    "entre splits, y que toda foto viniera de una obra.\n\n"
-                    "El último falló en la práctica: en una foto de un "
-                    "partido de fútbol el detector marcó botas sobre los "
-                    "tenis y dejó una gafa por encima de los ojos. Al barrer "
-                    "las 1,413 imágenes se encontraron 9 pares de cajas de "
-                    "botas repetidas y 2 gafas fuera de lugar. La corrección "
-                    "fue solo visual (no repetir cajas solapadas, y el "
-                    "re-anclaje de gafas ya no sube tanto): las alertas y "
-                    "las métricas no cambiaron — se re-corró la suite para "
-                    "comprobarlo. La lección queda escrita: el agente es "
-                    "para obras; otros contextos exigen otros datos.")
-            with gr.Accordion("3. Métricas del detector (nivel caja)", 
+                    "Un análisis honesto también dice qué es lo que NO "
+                    "puede certificar. Tres cosas quedaron fuera y así "
+                    "quedó escrito en el informe del EDA:\n\n"
+                    "1. **La calidad de las etiquetas.** Se comprobó que "
+                    "las 1,129 etiquetas de train coinciden al 100% con "
+                    "los metadatos oficiales y respetan el formato YOLO; "
+                    "lo que no se puede comprobar es si quien las dibujó "
+                    "a ojo acertó (si esa caja es realmente un casco).\n"
+                    "2. **Fotos casi duplicadas.** Dos copias de la misma "
+                    "escena en splits distintos inflarían la "
+                    "generalización (near-duplicate leakage). No se "
+                    "midió; queda como trabajo futuro.\n"
+                    "3. **El dominio.** Nadie comprobó que toda foto "
+                    "viniera de una obra de construcción.\n\n"
+                    "El tercero falló en la práctica, y la evidencia es "
+                    "la foto del fútbol: en la imagen de un partido, el "
+                    "detector marcó botas sobre los tenis y dibujó una "
+                    "gafa por encima de los ojos. Al barrer las 1,413 "
+                    "imágenes se encontraron 9 pares de botas repetidas "
+                    "y 2 gafas fuera de lugar. La corrección fue solo "
+                    "visual (no repetir cajas solapadas; el re-anclaje "
+                    "de gafas ya no sube tanto): las alertas y las "
+                    "métricas no cambiaron — se volvió a correr la suite "
+                    "para comprobarlo. La lección quedó escrita: el "
+                    "agente es para obras; otros contextos exigen otros "
+                    "datos.")
+            with gr.Accordion("3. Métricas del detector (nivel caja)",
                               open=False):
                 if metricas:
                     gr.Markdown(
@@ -846,6 +1014,29 @@ def construir_ui():
                         "saldría inflado y no diría nada. La exactitud del "
                         "agente sí se puede medir bien, por escena: está "
                         "en la sección 4.")
+                    gr.Markdown(
+                        "**Por qué `no_boots` es lo más difícil de detectar "
+                        "(y lo sería con cualquier modelo entrenado con "
+                        "este dataset).** No es un bug del modelo: es la "
+                        "señal que hubo para aprender. `no_boots` tiene "
+                        "**115 cajas de las 11,521 del dataset (1%)** — "
+                        "19.5 veces menos que la clase más común (`Person`) "
+                        "— y solo **88 de las 1,130 imágenes de train** "
+                        "muestran a alguien sin botas. Encima, la "
+                        "geometría juega en contra: en planos abiertos las "
+                        "botas son de los objetos más pequeños de la foto "
+                        "(la caja mediana ocupa el 1.85% de la imagen, "
+                        "figura 4 de la sección 1) y suelen quedar en el "
+                        "borde inferior, medio fuera de cuadro. Para la "
+                        "evaluación el soporte es tan pequeño (2 escenas "
+                        "en val, 6 en test) que un solo acierto o fallo "
+                        "salta la métrica en pasos enormes: el número "
+                        "casi no se puede fiar. Ni el oversampling ×3 "
+                        "probado en el proyecto la arregló (hallazgo "
+                        "negativo documentado en la bitácora). Por eso "
+                        "queda declarada como la clase más débil en vez "
+                        "de maquillada: el agente se mide por escena, y "
+                        "allí el sistema sí cumple (sección 4).")
                     for split in ("val", "test"):
                         s = metricas["splits"][split]
                         gr.Markdown(f"**Split {split}** — mAP50 = "
@@ -884,8 +1075,10 @@ def construir_ui():
                         interactive=False,
                         label="Resultados por escena")
                     gr.Markdown(
-                        "**Las medidas pre-registradas de la entrega "
-                        "(corrida oficial, 5 repeticiones):**\n\n"
+                        "**Las medidas pre-registradas de la entrega** "
+                        "(las mismas M1–M4 de la pestaña de pruebas; el "
+                        "umbral es el objetivo fijado antes de construir "
+                        "el agente — corrida oficial, 5 repeticiones):\n\n"
                         "| Medida | Fórmula | Umbral | Resultado |\n"
                         "|---|---|---|---|\n"
                         "| M1 recall de incidente | escenas con alerta / "
@@ -910,7 +1103,7 @@ def construir_ui():
                     gr.Markdown("_(no se encontró "
                                 "`eda/salidas/metricas_e44.json`)_")
 
-        # ---------------- pestana 5: instrucciones ----------------
+        # ---------------- pestana 6: instrucciones ----------------
         with gr.Tab("Cómo probar"):
             gr.Markdown(INSTRUCCIONES)
 
@@ -919,17 +1112,20 @@ def construir_ui():
             zona = f"web_{uuid.uuid4().hex[:8]}"
             ses = {"verificaciones": 0, "alertas": 0, "frames_fallidos": 0,
                    "log": [], "seed": random.randint(1, 9999), "sorteos": 0}
-            return zona, ses, _resumen_md(zona, ses), ses["seed"]
+            resumen = _resumen_md(zona, ses)
+            return zona, ses, resumen, resumen, ses["seed"]
 
         demo.load(_nueva_sesion, None,
-                  [st_zona, st_ses, resumen_md, seed_in])
+                  [st_zona, st_ses, resumen_md, resumen_falla_md, seed_in])
         btn_ver.click(verificar, [img_in, st_zona, st_gt, st_ses],
                       [img_out, decision_md, det_df, payload_md, resumen_md,
-                       log_txt, st_ses])
+                       resumen_falla_md, log_txt, log_falla_txt, st_ses])
         btn_foto.click(foto_aleatoria, [seed_in, st_ses],
-                       [img_in, gt_md, st_gt, log_txt, st_ses])
+                       [img_in, gt_md, st_gt, log_txt, log_falla_txt,
+                        st_ses])
         btn_falla.click(simular_falla, [radio_falla, st_zona, st_ses],
-                        [img_out, decision_md, resumen_md, log_txt, st_ses])
+                        [img_falla_out, md_falla, resumen_md,
+                         resumen_falla_md, log_txt, log_falla_txt, st_ses])
         btn_b.click(correr_parte_b, None,
                     [estado_b, tabla_b, veredicto_b, csv_b, json_b, log_b])
         btn_a.click(correr_parte_a, None,
@@ -952,9 +1148,10 @@ callado. Las pocas veces que alerte en una escena así son las falsas
 alarmas que mide M2.
 
 **3. El caso de falla del sensor**
-Elige un tipo de falla y simúlala: el agente registra el frame fallido y
-sigue trabajando, no se cae. Con el frame negro no hay falla: es una imagen
-válida sin contenido, no detecta nada y no alerta.
+En la pestaña «Fallas del sensor» elige un tipo de falla y simúlala: el
+agente registra el frame fallido y sigue trabajando, no se cae. Con el
+frame negro no hay falla: es una imagen válida sin contenido, no detecta
+nada y no alerta.
 
 **4. Con tu propia cámara**
 Autoriza la webcam y toma una captura: si apareces con la cabeza descubierta
@@ -962,7 +1159,7 @@ en primer plano, lo más probable es que te marque como "SIN CASCO".
 
 **5. Las pruebas de desempeño**
 Corre los 13 escenarios en la pestaña de pruebas y compara con la corrida
-oficial de la tercera pestaña: en CPU deben salir iguales.
+oficial en «Resultados oficiales»: en CPU deben salir iguales.
 
 ### Qué hace cada parte
 - El que ve es el detector (YOLOv8s, una herramienta externa): encuentra
@@ -978,6 +1175,16 @@ repositorio (el enlace va en el documento de la entrega).
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Página de demostración de SafeSite-Agent")
+    parser.add_argument(
+        "--tema", default=None,
+        help="tema de color: esmeralda (default), grafito, rosa, ambar, "
+             "azul, ocean o neon")
+    args = parser.parse_args()
+    if args.tema:
+        os.environ["SAFESITE_TEMA"] = args.tema
     demo = construir_ui()
     puerto = int(os.environ.get("SAFESITE_PUERTO", "7860"))
     # En el Space hay que escuchar en 0.0.0.0; local, en 127.0.0.1 para que

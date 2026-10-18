@@ -1,0 +1,18 @@
+# Generado por eda/06_resplit_oficial.py — Fase 0 (13-oct-2026)
+# Splits OFICIALES del NDJSON Ultralytics Construction PPE
+path: C:/Users/Lenovo/Documents/IA/SAFESITE-AGENT/dataset_v2
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: helmet
+  1: gloves
+  2: vest
+  3: boots
+  4: goggles
+  5: none
+  6: Person
+  7: no_helmet
+  8: no_goggle
+  9: no_gloves
+  10: no_boots

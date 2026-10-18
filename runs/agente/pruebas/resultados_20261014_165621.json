@@ -1,0 +1,359 @@
+{
+  "suite": "Fase 3 — pruebas contra medidas de desempeno (enunciado)",
+  "fecha": "20261014_165621",
+  "config": {
+    "modelo": "runs\\safesite\\tuned_v2_s\\weights\\best.pt",
+    "device": "0",
+    "k_frames": 3,
+    "cooldown_s": 30.0,
+    "umbral_incumplimiento": 0.15,
+    "repeticiones": 5,
+    "seed": 42,
+    "fps_simulado": 2.0
+  },
+  "M1_recall_incidente": {
+    "val": {
+      "formula_M1": "escenas incidente con >=1 alerta / escenas incidente",
+      "umbral_M1": 0.7,
+      "casos_M1": 28,
+      "recall_media": 0.964,
+      "recall_std": 0.0,
+      "cumple_M1": true,
+      "formula_M2": "escenas control con alerta / escenas control",
+      "umbral_M2": 0.1,
+      "casos_M2": 115,
+      "falsas_media": 0.035,
+      "falsas_std": 0.0,
+      "cumple_M2": true
+    },
+    "test": {
+      "formula_M1": "escenas incidente con >=1 alerta / escenas incidente",
+      "umbral_M1": 0.7,
+      "casos_M1": 26,
+      "recall_media": 0.962,
+      "recall_std": 0.0,
+      "cumple_M1": true,
+      "formula_M2": "escenas control con alerta / escenas control",
+      "umbral_M2": 0.1,
+      "casos_M2": 114,
+      "falsas_media": 0.026,
+      "falsas_std": 0.0,
+      "cumple_M2": true
+    }
+  },
+  "M2_falsas_alarmas": {
+    "val": {
+      "media": 0.035,
+      "std": 0.0,
+      "casos": 115
+    },
+    "test": {
+      "media": 0.026,
+      "std": 0.0,
+      "casos": 114
+    }
+  },
+  "M3_tiempo_notificacion": {
+    "formula": "t(confirmacion) - t(inicio racha) + K*latencia_frame + envio WhatsApp (medido E24)",
+    "umbral_s": 10.0,
+    "t_sim_media_s": 1.0,
+    "t_sim_std_s": 0.0,
+    "latencia_frame_ms": 39.3,
+    "envio_whatsapp_s": 1.9,
+    "t_total_estimado_s": 3.02,
+    "cumple": true
+  },
+  "M4_cooldown": {
+    "formula": "alertas duplicadas dentro del cooldown / reincidentes",
+    "umbral": 0,
+    "S6_alertas": 1,
+    "S7_alertas": 2,
+    "cumple": true
+  },
+  "escenarios": [
+    {
+      "escenario": "S1",
+      "tipo": "normal",
+      "descripcion": "Trabajador con EPP visible (casco+chaleco): sin alertas",
+      "alertas_media": 0,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": null,
+      "t_alerta_sim_std_s": null,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S1",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 0,
+        "clases_alertadas": [],
+        "t_alerta_sim_s": null,
+        "tipo": "normal",
+        "descripcion": "Trabajador con EPP visible (casco+chaleco): sin alertas",
+        "latencia_media_ms": 32.4
+      }
+    },
+    {
+      "escenario": "S2",
+      "tipo": "normal",
+      "descripcion": "Trabajador sin casco (solo no_helmet): alerta unica",
+      "alertas_media": 1,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": 1.0,
+      "t_alerta_sim_std_s": 0.0,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S2",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 1,
+        "clases_alertadas": [
+          "no_boots"
+        ],
+        "t_alerta_sim_s": 1.0,
+        "tipo": "normal",
+        "descripcion": "Trabajador sin casco (solo no_helmet): alerta unica",
+        "latencia_media_ms": 34.4
+      }
+    },
+    {
+      "escenario": "S3",
+      "tipo": "normal",
+      "descripcion": "Trabajador sin guantes (no_gloves): alerta unica",
+      "alertas_media": 3,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": 1.0,
+      "t_alerta_sim_std_s": 0.0,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S3",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 3,
+        "clases_alertadas": [
+          "no_gloves",
+          "no_goggle",
+          "no_helmet"
+        ],
+        "t_alerta_sim_s": 1.0,
+        "tipo": "normal",
+        "descripcion": "Trabajador sin guantes (no_gloves): alerta unica",
+        "latencia_media_ms": 31.1
+      }
+    },
+    {
+      "escenario": "S4",
+      "tipo": "limite",
+      "descripcion": "Incumplimientos multiples en la misma escena: lote",
+      "alertas_media": 1,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": 1.0,
+      "t_alerta_sim_std_s": 0.0,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S4",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 1,
+        "clases_alertadas": [
+          "no_boots"
+        ],
+        "t_alerta_sim_s": 1.0,
+        "tipo": "limite",
+        "descripcion": "Incumplimientos multiples en la misma escena: lote",
+        "latencia_media_ms": 38.6
+      }
+    },
+    {
+      "escenario": "S5",
+      "tipo": "limite",
+      "descripcion": "Persona lejana/pequena en escena incidente",
+      "alertas_media": 0,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": null,
+      "t_alerta_sim_std_s": null,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S5",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 0,
+        "clases_alertadas": [],
+        "t_alerta_sim_s": null,
+        "tipo": "limite",
+        "descripcion": "Persona lejana/pequena en escena incidente",
+        "latencia_media_ms": 39.4
+      }
+    },
+    {
+      "escenario": "S6",
+      "tipo": "limite",
+      "descripcion": "Reincidencia dentro del cooldown (30 s): 1 sola alerta",
+      "alertas_media": 1,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": 1.0,
+      "t_alerta_sim_std_s": 0.0,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S6",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 1,
+        "t_alerta_sim_s": 1.0,
+        "bloqueadas": 1,
+        "tipo": "limite",
+        "descripcion": "Reincidencia dentro del cooldown (30 s): 1 sola alerta",
+        "latencia_media_ms": 41.2
+      }
+    },
+    {
+      "escenario": "S7",
+      "tipo": "limite",
+      "descripcion": "Reincidencia despues del cooldown: 2 alertas",
+      "alertas_media": 2,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": 1.0,
+      "t_alerta_sim_std_s": 0.0,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S7",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 2,
+        "t_alerta_sim_s": 1.0,
+        "bloqueadas": 0,
+        "tipo": "limite",
+        "descripcion": "Reincidencia despues del cooldown: 2 alertas",
+        "latencia_media_ms": 34.1
+      }
+    },
+    {
+      "escenario": "S8",
+      "tipo": "normal",
+      "descripcion": "Escena sin personas: sin alertas",
+      "alertas_media": 0,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": null,
+      "t_alerta_sim_std_s": null,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S8",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 0,
+        "clases_alertadas": [],
+        "t_alerta_sim_s": null,
+        "tipo": "normal",
+        "descripcion": "Escena sin personas: sin alertas",
+        "latencia_media_ms": 27.9
+      }
+    },
+    {
+      "escenario": "S9",
+      "tipo": "limite",
+      "descripcion": "Frame negro (sensor sin senal): sin alertas ni error",
+      "alertas_media": 0,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": null,
+      "t_alerta_sim_std_s": null,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S9",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 0,
+        "fallos_percepcion": 0,
+        "tipo": "limite",
+        "descripcion": "Frame negro (sensor sin senal): sin alertas ni error",
+        "latencia_media_ms": 33.0
+      }
+    },
+    {
+      "escenario": "S10",
+      "tipo": "falla",
+      "descripcion": "Sensor sin dato (frame None): registrado, sin crash",
+      "alertas_media": 0,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": null,
+      "t_alerta_sim_std_s": null,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S10",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 0,
+        "fallos_percepcion": 4,
+        "tipo": "falla",
+        "descripcion": "Sensor sin dato (frame None): registrado, sin crash",
+        "latencia_media_ms": 0.0
+      }
+    },
+    {
+      "escenario": "S11",
+      "tipo": "falla",
+      "descripcion": "Entrada invalida (frame 1 canal): sin crash",
+      "alertas_media": 0,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": null,
+      "t_alerta_sim_std_s": null,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S11",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 0,
+        "fallos_percepcion": 4,
+        "tipo": "falla",
+        "descripcion": "Entrada invalida (frame 1 canal): sin crash",
+        "latencia_media_ms": 0.0
+      }
+    },
+    {
+      "escenario": "S12",
+      "tipo": "falla",
+      "descripcion": "WhatsApp Cloud API caida: degradacion, alerta persistida",
+      "alertas_media": 0,
+      "alertas_std": 0.0,
+      "t_alerta_sim_media_s": null,
+      "t_alerta_sim_std_s": null,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S12",
+        "rep": 5,
+        "excepcion": null,
+        "alertas": 0,
+        "alertas_historial": 1,
+        "excepcion_actuador": false,
+        "tipo": "falla",
+        "descripcion": "WhatsApp Cloud API caida: degradacion, alerta persistida",
+        "latencia_media_ms": 52.0
+      }
+    },
+    {
+      "escenario": "S13",
+      "tipo": "falla",
+      "descripcion": "Checkpoint inexistente: fallo de arranque controlado",
+      "alertas_media": null,
+      "alertas_std": null,
+      "t_alerta_sim_media_s": null,
+      "t_alerta_sim_std_s": null,
+      "excepciones": [],
+      "detalle_ultima_rep": {
+        "escenario": "S13",
+        "rep": 5,
+        "excepcion": null,
+        "arranque_fallo": true,
+        "mensaje_error": "FileNotFoundError",
+        "tipo": "falla",
+        "descripcion": "Checkpoint inexistente: fallo de arranque controlado",
+        "latencia_media_ms": 0.0
+      }
+    }
+  ],
+  "evidencia": {
+    "log_ejecucion": "C:\\Users\\Lenovo\\Documents\\IA\\SAFESITE-AGENT\\runs\\agente\\pruebas\\log_ejecucion.jsonl",
+    "csv": "C:\\Users\\Lenovo\\Documents\\IA\\SAFESITE-AGENT\\runs\\agente\\pruebas\\resultados_20261014_165621.csv",
+    "json": "C:\\Users\\Lenovo\\Documents\\IA\\SAFESITE-AGENT\\runs\\agente\\pruebas\\resultados_20261014_165621.json",
+    "historial_incidentes": "runs\\agente\\historial_incidentes.jsonl",
+    "nota": "envio WhatsApp real (E24): media 1.9 s, max 2.5 s; ciclo completo en vivo (E28): ~2.6 s por alerta"
+  }
+}

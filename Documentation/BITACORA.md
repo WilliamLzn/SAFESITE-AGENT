@@ -897,6 +897,56 @@ $env:HF_TOKEN = "hf_xxx"   # token de https://huggingface.co/settings/tokens
 
 ---
 
+### E47 — Página: explicaciones de lectura, fallas del sensor en pestaña propia y tema rosa (18-oct)
+
+**Petición del usuario (7 partes):** (1) el título "Lo que no se pudo validar (y la foto del fútbol)" parecía fuera de lugar — mejorarlo; (2) explicar en las métricas del detector por qué `no_boots` es lo más difícil de detectar; (3) ¿las figuras de la sección 1 del EDA son todas? agregar las que falten y describir qué representa cada una; (4) explicar qué significan las 2 tablas de Resultados oficiales; (5) explicar por qué las medidas se llaman M1–M4 y cómo interpretar sus resultados; (6) separar la simulación de fallos en un apartado independiente; (7) probar los temas de color grafito y rosa.
+
+**Cambios (todos en `deploy/app.py` salvo donde se indica):**
+
+1. Sección 2 del EDA renombrada **"Límites de la validación: lo que quedó sin comprobar"** y reescrita: lista numerada de los 3 pendientes (calidad semántica de las etiquetas, near-duplicates, dominio) y la foto del fútbol como evidencia práctica del tercero.
+2. Sección 3: bloque nuevo "Por qué `no_boots` es lo más difícil de detectar" — 115 cajas de 11,521 (1%, 19.5× menos que `Person`), 88 de 1,130 imágenes de train con la clase, geometría adversa (caja mediana 1.85% de la imagen, borde inferior del cuadro), soporte de evaluación de 2 escenas en val / 6 en test (un acierto mueve la métrica en saltos), oversampling ×3 como hallazgo negativo, y el cierre de diseño: el agente se mide por escena.
+3. Sección 1: galería completa con las **6 figuras del EDA** (faltaban `fig4_areas` y `fig5_dimensiones`), cada una con su lectura: qué muestra y por qué está en la página.
+4. Resultados oficiales: intro "Cómo leer estas dos tablas" — la primera es el veredicto M1–M4 contra el umbral pre-registrado (el "± 0.0" es determinismo, no sospecha); la segunda el detalle S1–S13 con los tipos normal/límite/falla y S6/S7 como evidencia de M4.
+5. Pruebas (M1–M4): intro con tabla de las 4 medidas (qué mide / cómo se calcula / objetivo), por qué "pre-registradas" hace honesta la evaluación, y cómo leer la tabla de escenarios (media±σ, t_alerta, Excepciones = 0). La sección 4 del EDA ahora enlaza con ellas.
+6. **Pestaña nueva "Fallas del sensor"** (antes vivía dentro de la demo): los 3 casos con la reacción frame por frame; resumen y bitácora compartidos entre pestañas (misma sesión, se actualizan en ambas); instrucciones y numeración de pestañas actualizadas.
+7. **Tema rosa**: `_tema()` ahora acepta `rosa` (Soft con primario `rose`, neutral `stone` — grafito cálido en oscuro, ya existía); `main()` acepta `--tema` además de `SAFESITE_TEMA`. `deploy/README.md` documenta cómo cambiarlo en local y en el Space (Settings → Variables → `SAFESITE_TEMA`).
+
+**Smoke:** `py_compile` OK; `construir_ui()` sin traceback; los 3 temas (esmeralda, grafito, rosa) construyen; 17 textos nuevos presentes y los viejos fuera (título de la sección 2, "tercera pestaña"); **13 tests del núcleo en 0.26 s**; arranque real con `--tema grafito` respondiendo en el 7860 (verificado con curl y proceso detenido por el PID dueño del puerto).
+
+**Archivos:** `deploy/app.py`, `deploy/README.md`, `Documentation/BITACORA.md`, `AGENTS.md` (deploy/ agregado al mapa).
+
+---
+
+### E48 — Publicación de la demo: Hugging Face ya no es gratis (402) → demo pública desde el PC con túnel cloudflared (18-oct)
+
+**Petición del usuario:** hacer el deploy de la página en Hugging Face Spaces.
+
+**Intento y hallazgo (negativo):** `deploy/sincronizar_space.py --repo-id WilliamLzn/safesite-agent-demo` con token de escritura — el ensamblado pasó (601 archivos, 55.7 MB, el nuevo `app.py` de E47 incluido, smoke `--no-push` previo OK) pero `create_repo` falló con **HTTP 402 Payment Required**: *"hosting Gradio and Docker Spaces on free cpu-basic requires a PRO subscription"*. Es política actual de HF (solo los Static Spaces siguen gratis, y no sirven aquí: la página necesita Python en el servidor para ejecutar el agente). El usuario decide no pagar la suscripción.
+
+**Alternativa implementada — `deploy/demo_publica.py`:** la página corre en el PC (la RTX 4050 procesa más rápido que el CPU del Space) y se publica con el mismo túnel cloudflared `--protocol http2` del piloto (E24). Comportamiento: busca un puerto libre desde el 7860 (no mata procesos ajenos — lección E15/E16, puede convivir con instancias abiertas), levanta `deploy/app.py` como subprocess (`--tema`, `--device`), espera el 200 local (hasta 3 min por la importación de torch), levanta el túnel y **verifica la URL pública antes de anunciarla**; la URL queda impresa y en `runs/agente/demo_url.txt`. Al `Ctrl+C` detiene solo su árbol (`taskkill /PID … /T /F`). La URL es https (la webcam de la demo funciona desde cualquier navegador) y vive mientras el proceso no se detenga; cambia en cada arranque (restricción P12 documentada).
+
+**Validación:** `py_compile` OK; arranque real con `--tema grafito` → URL `trycloudflare.com` entregada y respondiendo con 200 desde fuera.
+
+**Nota de seguridad:** el token de HF quedó expuesto en pantalla durante el intento — recomendación al usuario de revocarlo en huggingface.co/settings/tokens si no va a suscribirse.
+
+**Archivos:** `deploy/demo_publica.py` (nuevo), `Documentation/DESARROLLO_AGENTE.md` (§9.9: demo desde el PC, HF descartado con motivo), `deploy/README.md` (sección de demo pública), `Documentation/BITACORA.md`.
+
+---
+
+### E49 — Publicación definitiva: GitHub Codespaces (VM en la nube, gratis); el túnel al PC queda como emergencia (18-oct)
+
+**Petición del usuario:** el túnel a su PC no le parece adecuado ("eso de que depende de un túnel a mi PC no me gusta en absoluto") — descartarlo y usar una alternativa de nube. Elección: **GitHub Codespaces** — el repo ya vive en GitHub, la página corre en una VM de GitHub y se publica con el port forwarding https del propio Codespace (`https://<codespace>-7860.app.github.dev`); cuota gratuita de 60 h-core/mes (90 con el Student Pack), sin GPU (la app corre en CPU, `SAFESITE_DEVICE` por defecto).
+
+**Qué hacía falta versionar:** la página lee artefactos que el repo ignoraba (`runs/` y `dataset_v2/` en `.gitignore`). Subidos con `git add -f` (~58 MB en total, todos por debajo del límite de GitHub): `runs/safesite/tuned_v2_s/weights/best.pt` (21.5 MB, checkpoint de despliegue), la corrida oficial completa en `runs/agente/pruebas/` (7 archivos, log 3.6 MB) y `dataset_v2/{images,labels}/{val,test}` + `dataset.yaml` (27.7 MB; dataset público de Ultralytics — train queda fuera: la página solo usa val y test). `eda/figuras/` y `metricas_e44.json` ya estaban versionados. El `.gitignore` no se toca: los archivos, ya trackeados, siguen reflejando sus cambios.
+
+**Devcontainer:** `.devcontainer/devcontainer.json` — imagen Python 3.12, `postCreateCommand` instala `libgl1`/`libglib2.0-0` (cv2 en Linux lo necesita) y `deploy/requirements.txt` (torch-cpu + ultralytics + gradio), `forwardPorts` 7860 con label. Primera creación ~5–8 min; arranques siguientes en segundos; el codespace se pausa/reanuda y la URL pública del puerto se conserva. Paso clave documentado: **Port Visibility → Public** en el 7860 (sin eso, la URL solo la ve el dueño de la sesión).
+
+**Uso (documentado en `deploy/README.md`):** Code → Codespaces → crear → `python deploy/app.py` → puerto 7860 → Public → abrir `https://…-7860.app.github.dev` (https → la webcam funciona desde cualquier dispositivo). `demo_publica.py` (E48) queda degradado a plan de emergencia.
+
+**Archivos:** `.devcontainer/devcontainer.json` (nuevo), `deploy/README.md`, `Documentation/BITACORA.md`, `AGENTS.md` (mapa y estado); versionados con add -f: `best.pt`, `runs/agente/pruebas/`, `dataset_v2` val/test + `dataset.yaml`. **Commit y push incluidos en esta ejecución.**
+
+---
+
 ## 📊 Tabla resumen del EDA (para evaluación rápida)
 
 | Indicador | Valor | Estado |
