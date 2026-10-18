@@ -48,31 +48,45 @@ En el Space: Settings → Variables and secrets → nueva variable
 `SAFESITE_TEMA` con valor `grafito` (o `rosa`), y el Space se reinicia
 solo.
 
-## Demo en GitHub Codespaces (recomendado, gratis)
+## Demo permanente en Claw Cloud (recomendado, gratis y 24/7)
 
-La página corre en una VM gratuita de GitHub, no en el PC y sin túneles:
-el repo ya trae el `.devcontainer/devcontainer.json` con todo
-preinstalado (torch-cpu, ultralytics, gradio).
+La página vive en un contenedor en la nube: no depende del PC ni de
+encender nada. Claw Cloud regala $5/mes de crédito con una cuenta de
+GitHub de más de 180 días, y un contenedor de esta app (2 GB de RAM)
+cabe en ese crédito. La imagen ya está lista (`deploy/Dockerfile`,
+validada localmente: construye y sirve la página).
 
-1. En GitHub, sobre el repo: botón **Code → pestaña Codespaces →
-   create codespace on main**. La primera vez tarda ~5–8 min
-   (instala las librerías); los arranques siguientes, segundos.
-2. En la terminal del codespace:
-   ```bash
-   python deploy/app.py
+1. Cuenta en **claw.cloud** entrando con tu GitHub (los $5 llegan si la
+   cuenta de GitHub tiene más de 180 días).
+2. En el panel de Claw Cloud Run: **Settings → Access Key → crear**
+   (sirve para subir la imagen; puedes borrarla al terminar).
+3. Desde la raíz del repo, construir y subir la imagen:
+   ```powershell
+   docker build -f deploy/Dockerfile -t safesite-demo .
+   docker login hub.claw.cloud        # usuario de Claw + la access key
+   docker tag safesite-demo:latest hub.claw.cloud/<TU_USUARIO>/safesite-demo:latest
+   docker push hub.claw.cloud/<TU_USUARIO>/safesite-demo:latest
    ```
-3. En el panel **Ports** de abajo, click derecho sobre el puerto 7860 →
-   **Port Visibility → Public** (con esto cualquiera con la URL puede
-   abrirla, sin cuenta de GitHub).
-4. La URL pública es la del 7860: `https://…-7860.app.github.dev`.
-   Es https, así que la webcam de la demo funciona desde cualquier
-   navegador, incluido el celular.
+   El primer push sube ~2.8 GB (puede tardar; las siguientes veces solo
+   sube lo que cambió).
+4. En Claw Cloud Run: **App List → Create App**, imagen
+   `hub.claw.cloud/<TU_USUARIO>/safesite-demo:latest`, recursos
+   **1–2 vCPU y 2 GB de RAM** (la app consume ~0.8 GB), puerto **8788**
+   (ya viene configurado en la imagen).
+5. Deploy → URL **https** pública y permanente, con la webcam funcional.
+   Cada vez que cambies la página: reconstruir, `push` y redeploy.
 
-El codespace se puede pausar (**Stop codespace**) y reanudar cuando se
-necesite: la URL pública del puerto se conserva. La cuota gratuita es de
-60 h-core al mes (con el GitHub Student Pack, verificable con el correo
-institucional, sube a 90): de sobra para una demo. La app corre en CPU
-(las VM gratuitas no tienen GPU).
+Por qué no Render: el free tier da 512 MB de RAM y la app consume
+835–858 MB medidas en CPU (moriría con out-of-memory), y además duerme
+tras 15 min sin visitas.
+
+## Demo en GitHub Codespaces (gratis, para presentaciones puntuales)
+
+Para un día concreto: **Code → Codespaces → create codespace on main**
+(~5–8 min la primera vez), `python deploy/app.py`, click derecho en el
+puerto 7860 del panel **Ports → Port Visibility → Public**, y abrir la
+URL `https://…-7860.app.github.dev`. El codespace se pausa y reanuda
+conservando la URL. No sirve para "siempre listo": hay que encenderlo.
 
 ## Emergencia: demo desde el PC
 

@@ -947,6 +947,22 @@ $env:HF_TOKEN = "hf_xxx"   # token de https://huggingface.co/settings/tokens
 
 ---
 
+### E50 — Plataforma permanente gratis: Claw Cloud con imagen Docker; Render descartado con medición de RAM (18-oct)
+
+**Petición del usuario:** la demo debe quedar en una plataforma **totalmente independiente** (no sabe cuándo lo evaluarán) y gratis. Pregunta explícita por Render; llamativa la opción Claw Cloud.
+
+**Medición para decidir con datos:** script temporal que instancia el agente en CPU y procesa escenas como la página → **RAM 835 MB (pico 858), 565–879 ms/frame**. Conclusión: **Render free queda descartado** (512 MB → OOM seguro, y encima duerme tras 15 min sin visitas). Nota operativa honesta: la primera pasada del script usó los actuadores por defecto y **envió 1 alerta real de WhatsApp** al número de prueba (wamid recibido; el resto quedó en cooldown) — corregido al instante usando `ActuadorNulo`, el mismo patrón de la página; lección: nunca instanciar el agente sin actuador nulo fuera de producción.
+
+**Implementado — imagen Docker de la demo (`deploy/Dockerfile` + `.dockerignore`, nuevos):** `python:3.12-slim` + libgl1/libglib2.0 (cv2 en Linux) + `deploy/requirements.txt` (torch-cpu); los artefactos entran por `COPY` granular (app, src, val/test, figuras, métricas, best.pt, corrida oficial). `ENV SAFESITE_DEVICE=cpu, SAFESITE_PUERTO=8788, SAFESITE_SERVIDOR=publico` — esta última nueva en `app.py`: fuera del Space de HF también hace falta escuchar en `0.0.0.0` dentro de un contenedor.
+
+**Validación local completa:** `docker build` OK (imagen 2.84 GB; torch 2.14.1+cpu existe para linux cp312); `docker run -p 7899:8788` → **HTTP 200 con el HTML de la página**; contenedor de prueba retirado.
+
+**Despliegue en Claw Cloud (vía permanente elegida, corre 24/7):** gratis con $5/mes de crédito (requiere cuenta GitHub ≥180 días). Pasos documentados en `deploy/README.md`: access key → `docker login hub.claw.cloud` → tag + push de la imagen (~2.8 GB la primera vez) → Create App con 1–2 vCPU / 2 GB RAM / puerto 8788 → URL https pública permanente (la webcam funciona por ser https). Render: descartado con la medición de arriba. Codespaces queda como vía secundaria para presentaciones puntuales; `demo_publica.py` de emergencia.
+
+**Archivos:** `deploy/Dockerfile`, `.dockerignore` (nuevos), `deploy/app.py` (SAFESITE_SERVIDOR), `deploy/README.md` (Claw como vía permanente + por qué no Render), `Documentation/BITACORA.md`, `AGENTS.md`. **Commit y push incluidos en esta ejecución.** Pendiente del usuario: cuenta Claw + access key + push + Create App.
+
+---
+
 ## 📊 Tabla resumen del EDA (para evaluación rápida)
 
 | Indicador | Valor | Estado |

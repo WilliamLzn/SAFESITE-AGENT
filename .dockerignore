@@ -1,0 +1,23 @@
+# Qué no entra al contexto de build del Dockerfile (deploy/Dockerfile).
+# Los COPY del Dockerfile eligen después qué pasa a la imagen.
+.git
+.venv
+.opencode
+.vscode
+.idea
+**/__pycache__
+**/*.pyc
+.pytest_cache
+deploy/space_build
+safesite_dataset
+dataset_v2/images/train
+dataset_v2/labels/train
+runs/agente/alertas
+runs/agente/banco_vivo
+runs/agente/pruebas_web
+runs/agente/validacion_anclaje
+runs/agente/verificacion_futbol
+runs/agente/verificacion_percepcion
+runs/safesite/baseline_v1
+runs/safesite/tuned_v1
+runs/detect

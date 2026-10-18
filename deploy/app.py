@@ -1189,9 +1189,12 @@ def main():
     puerto = int(os.environ.get("SAFESITE_PUERTO", "7860"))
     # En el Space hay que escuchar en 0.0.0.0; local, en 127.0.0.1 para que
     # la URL impresa sea abrible en el navegador (0.0.0.0 no se abre).
-    en_space = bool(os.environ.get("HF_SPACE_ID")
-                    or os.environ.get("SPACE_ID"))
-    server = "0.0.0.0" if en_space else "127.0.0.1"
+    # En contenedores (Docker/Claw) también hace falta 0.0.0.0: se marca
+    # con SAFESITE_SERVIDOR=publico en la imagen.
+    en_publico = (bool(os.environ.get("HF_SPACE_ID")
+                      or os.environ.get("SPACE_ID"))
+                  or os.environ.get("SAFESITE_SERVIDOR") == "publico")
+    server = "0.0.0.0" if en_publico else "127.0.0.1"
     print(f"\nAbre el navegador en: http://localhost:{puerto}\n")
     demo.queue().launch(server_name=server, server_port=puerto,
                         theme=_tema(), show_error=True)
