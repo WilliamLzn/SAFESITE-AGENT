@@ -191,5 +191,6 @@ El análisis completo (una página: causas del caso límite S5 y propuestas de c
 ## 9.9 Enlaces
 
 - **Repositorio:** `https://github.com/WilliamLzn/SAFESITE-AGENT`
-- **Demo pública (Gradio):** servida desde el PC del equipo con `deploy/demo_publica.py` (página local + túnel cloudflared); la URL vigente queda en `runs/agente/demo_url.txt`. El hospedaje gratuito en Hugging Face Spaces se descartó: el tier cpu-basic de los Spaces de Gradio pasó a requerir suscripción PRO (error 402 Payment Required al publicar, E48).
+- **Demo pública (estática, permanente):** `deploy/estatica/` publicada en un Hugging Face *Static Space* — el modelo exportado a ONNX corre en el navegador del visitante; URL: `https://<usuario>-safesite-demo.hf.space` (se registra al publicar, E52). La página incluye una «Nota del deploy» que explica esta versión frente a la original.
+- **Demo completa (Gradio + PyTorch, servidor):** `deploy/app.py` — versión con la suite corriendo en vivo, para sesión local con GPU o Codespaces.
 - **Logs de las pruebas:** `runs/agente/pruebas/` (JSONL + CSV + JSON + tabla Markdown)

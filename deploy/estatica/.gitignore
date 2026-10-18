@@ -1,0 +1,6 @@
+# Assets derivados: se regeneran con generar.py (que lee modelo, dataset
+# y métricas del propio repo). Solo se versiona el código de la página.
+modelo/
+fotos/
+figuras/
+datos.js

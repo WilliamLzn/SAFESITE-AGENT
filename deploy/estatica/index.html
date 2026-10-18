@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeSite Agent — Demo en vivo (modelo en tu navegador)</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <h1>👷 SafeSite Agent</h1>
+  <p class="sub">Monitoreo de EPP en obra — demo interactiva: percibe, confirma en el tiempo (K=3) y arma la alerta de WhatsApp</p>
+  <p class="nota-deploy" id="nota-deploy-corta">
+    <strong>Nota del deploy:</strong> el proyecto corre originalmente en un servidor Python/Gradio con PyTorch
+    (<code>deploy/app.py</code> en el repositorio). Esta página pública usa <em>el mismo modelo exportado a ONNX</em>
+    ejecutándose <strong>en tu navegador</strong>, porque el hospedaje con servidor dejó de tener capa gratuita.
+    Detalles en la pestaña <a href="#" data-tab="deploy">«Nota del deploy»</a>.
+  </p>
+</header>
+
+<nav id="tabs">
+  <button data-tab="demo" class="activo">Demo en vivo</button>
+  <button data-tab="fallas">Fallas del sensor</button>
+  <button data-tab="pruebas">Pruebas (M1–M4)</button>
+  <button data-tab="oficial">Resultados oficiales</button>
+  <button data-tab="eda">EDA y métricas</button>
+  <button data-tab="deploy">Nota del deploy</button>
+  <button data-tab="como">Cómo probar</button>
+</nav>
+
+<main>
+
+<!-- ============ 1. DEMO EN VIVO ============ -->
+<section id="demo" class="tab activo">
+  <p class="intro">Sube una imagen, usa tu cámara o trae una foto del set de test. Cada imagen se
+  procesa como un <strong>video corto de cuatro fotogramas</strong>: la falta solo se confirma si
+  aparece en tres seguidos. El mensaje al supervisor se <em>muestra</em>; nunca se envía desde aquí.</p>
+
+  <div id="estado-modelo" class="tarjeta">
+    <span id="estado-modelo-texto">Cargando el modelo en tu navegador (una sola vez, ~45 MB)…</span>
+    <span id="estado-modelo-extra"></span>
+  </div>
+
+  <div class="fila">
+    <div class="col">
+      <label class="boton-archivo">📷 Subir imagen <input type="file" id="archivo" accept="image/*"></label>
+      <button id="btn-foto" class="secundario">🎲 Traer una foto del set de test</button>
+      <button id="btn-webcam" class="secundario">🎥 Usar la webcam (en vivo, K=3 real)</button>
+      <div id="gt" class="gt"></div>
+      <div class="controles">
+        <button id="btn-procesar" class="primario" disabled>Procesar esta imagen</button>
+      </div>
+      <div id="resumen" class="resumen"></div>
+    </div>
+    <div class="col">
+      <div class="lienzo"><canvas id="lienzo"></canvas></div>
+      <p class="pie">Rojo = incumplimiento · verde = EPP presente · celeste = persona.
+      Las cajas de gafas se re-anclan a nivel de ojos (corrección de presentación E30).</p>
+    </div>
+  </div>
+
+  <div class="fila">
+    <div class="col">
+      <h3>La decisión del agente, frame por frame</h3>
+      <div id="linea-tiempo"></div>
+    </div>
+    <div class="col">
+      <h3>Lo que detectó (umbrales aplicados)</h3>
+      <table id="tabla-detecciones" class="tabla">
+        <thead><tr><th>Clase</th><th>Confianza</th><th>Tipo</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <h3>Mensaje al supervisor</h3>
+      <div id="payload" class="payload">Aún no hay nada procesado.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. FALLAS DEL SENSOR ============ -->
+<section id="fallas" class="tab">
+  <p class="intro">Las cámaras fallan: dejan de entregar datos, mandan basura o un frame sin
+  contenido. Lo correcto es registrar la falla y seguir en pie, sin caerse y sin inventar
+  alertas. El frame negro no es una falla: es una imagen válida sin contenido, de la que el
+  agente no saca nada.</p>
+  <div class="fila">
+    <div class="col">
+      <div class="radio">
+        <label><input type="radio" name="falla" value="none" checked> Frame None (sensor sin dato)</label>
+        <label><input type="radio" name="falla" value="negro"> Frame negro (señal sin contenido)</label>
+        <label><input type="radio" name="falla" value="gris"> Frame de 1 canal (formato inválido)</label>
+      </div>
+      <button id="btn-falla" class="primario">Simular la falla</button>
+    </div>
+    <div class="col">
+      <div class="lienzo"><canvas id="lienzo-falla"></canvas></div>
+      <div id="salida-falla" class="markdown">Elige un tipo de falla y simúlala para ver qué recibió
+      el agente y qué decidió con cada frame.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. PRUEBAS (M1–M4) ============ -->
+<section id="pruebas" class="tab">
+  <p class="intro">Las <strong>medidas M1–M4</strong> son los compromisos numéricos que el proyecto
+  se fijó <em>antes</em> de construir el agente (la M es de «medida»). Fijarlas antes es lo que hace
+  honesta la evaluación: la meta no se movió después de ver los resultados.</p>
+  <table class="tabla">
+    <thead><tr><th>Medida</th><th>Qué mide</th><th>Cómo se calcula</th><th>Objetivo</th></tr></thead>
+    <tbody>
+      <tr><td><strong>M1</strong> Recall de incidente</td><td>de las escenas que SÍ tienen una falta, en cuántas el agente alerta</td><td>escenas con alerta / escenas con falta</td><td>≥ 0.70</td></tr>
+      <tr><td><strong>M2</strong> Falsas alarmas</td><td>de las escenas SIN falta, en cuántas el agente alerta igual</td><td>escenas control alertadas / escenas control</td><td>≤ 0.10</td></tr>
+      <tr><td><strong>M3</strong> Tiempo de notificación</td><td>cuánto tarda el aviso en llegar al supervisor</td><td>confirmación (3 frames) + procesamiento + envío a WhatsApp</td><td>< 10 s</td></tr>
+      <tr><td><strong>M4</strong> Cooldown anti-spam</td><td>que no repita la misma alerta dentro de la ventana de 30 s</td><td>alertas duplicadas en la ventana</td><td>0</td></tr>
+    </tbody>
+  </table>
+  <h3>Cómo se corrieron y dónde están sus resultados</h3>
+  <p>La suite que las mide (13 escenarios S1–S13 y las 283 escenas de val/test) se ejecuta en el
+  servidor Python del proyecto (<code>src/safesite/pruebas_medidas.py</code>, misma lógica que esta
+  página). En esta versión de navegador <strong>no corren en vivo</strong> — procesar 283 escenas × 4
+  frames tardaría horas en el navegador — así que aquí se muestran los <a href="#" data-tab="oficial">resultados
+  oficiales</a> de la corrida real (GPU local, 5 repeticiones, 14 de octubre de 2026):</p>
+  <table id="tabla-m1m4" class="tabla">
+    <thead><tr><th>Medida</th><th>Fórmula</th><th>Umbral</th><th>Resultado</th><th>¿Cumple?</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p class="pie">«± 0.0» no es sospechoso: en un mismo equipo la corrida es determinista y las 5
+  repeticiones dan exactamente igual. M4 se comprueba con S6 y S7: la reincidencia dentro de la
+  ventana de cooldown produce 1 sola alerta; pasada la ventana, 2.</p>
+</section>
+
+<!-- ============ 4. RESULTADOS OFICIALES ============ -->
+<section id="oficial" class="tab">
+  <p class="intro">Corrida oficial de la suite, hecha en el equipo local con GPU y 5 repeticiones
+  (14 de octubre de 2026). Esta es la evidencia que vale para la entrega.</p>
+  <h3>Cómo leer las dos tablas</h3>
+  <p>La primera es el <strong>veredicto</strong>: cada fila es una medida (M1–M4) en su split;
+  «Fórmula» recuerda cómo se calcula, «Umbral» es el objetivo pre-registrado y «¿Cumple?» la
+  compara contra el resultado. La segunda es el <strong>detalle escenario por escenario</strong>
+  (S1–S13): «normal» es el caso típico, «límite» empuja los bordes del diseño y «falla» mete
+  entradas rotas donde lo correcto es degradarse sin caerse. «Alertas (media±σ)» es el promedio de
+  las repeticiones; «None» en t_alerta significa que ese escenario no debía alertar y no alertó.</p>
+  <div id="tabla-oficial" class="markdown"></div>
+</section>
+
+<!-- ============ 5. EDA Y MÉTRICAS ============ -->
+<section id="eda" class="tab">
+  <p class="intro">De dónde salen los datos del agente, qué se verificó antes de construirlo y con
+  qué números quedó.</p>
+
+  <details open>
+    <summary><strong>1. El dataset y los supuestos que se validaron</strong></summary>
+    <p>1,416 imágenes de obra (Construction PPE de Ultralytics) con 11 clases: persona, 5 equipos
+    de protección, 4 faltas <code>no_*</code> y una de ruido. Antes de construir el agente, cada
+    supuesto se verificó midiendo; varios resultaron falsos, y esas correcciones definieron al
+    agente que estás usando.</p>
+    <table class="tabla">
+      <thead><tr><th>Supuesto</th><th>Qué se encontró al medirlo</th><th>Qué se decidió</th></tr></thead>
+      <tbody>
+        <tr><td>Las etiquetas YOLO están bien escritas</td><td>Confirmado: las 1,129 etiquetas de train se verificaron una por una contra el NDJSON oficial, sin una sola discrepancia</td><td>No había nada que re-etiquetar</td></tr>
+        <tr><td>Los splits de train/val/test estaban bien repartidos</td><td>Falso: 112 imágenes del test oficial estaban metidas en el train, y no existía set de validación</td><td>Se rehízo el split completo (<code>dataset_v2</code>) y se creó el set de validación que faltaba</td></tr>
+        <tr><td>Hay suficientes ejemplos de faltas para aprender</td><td>Falso: solo el 20.3% de las imágenes de train muestra alguna falta <code>no_*</code>, y <code>no_boots</code> apenas aparece</td><td>Umbrales bajos (0.15) y confirmación temporal K=3; el proyecto se mide por recall por clase, no por exactitud global</td></tr>
+        <tr><td>«Sin casco» se puede deducir buscando el casco dentro de la caja de la persona</td><td>Falso: esa regla falla el 38.2% de las veces</td><td>Las decisiones usan únicamente las clases <code>no_*</code> explícitas del detector</td></tr>
+        <tr><td>Las cajas de gafas están a la altura de los ojos</td><td>Falso: la mediana queda al 14.5% de la altura de la persona, cuando los ojos reales van por el ~8%</td><td>Re-anclaje visual a nivel de ojos (solo presentación: no toca detecciones ni métricas)</td></tr>
+        <tr><td>Todas las imágenes son parecidas</td><td>No tanto: el 21.2% no es de 640×640 y el 4.5% de la muestra es muy oscura</td><td>La inferencia se mantiene en 640 o más; el aumento nocturno queda como recomendación para cámaras 24/7</td></tr>
+      </tbody>
+    </table>
+    <div class="galeria" id="galeria-eda"></div>
+  </details>
+
+  <details>
+    <summary><strong>2. Límites de la validación: lo que quedó sin comprobar</strong></summary>
+    <p>Un análisis honesto también dice qué es lo que NO puede certificar. Tres cosas quedaron
+    fuera y así quedó escrito en el informe del EDA:</p>
+    <ol>
+      <li><strong>La calidad de las etiquetas.</strong> Se comprobó que las 1,129 etiquetas de
+      train coinciden al 100% con los metadatos oficiales y respetan el formato YOLO; lo que no se
+      puede comprobar es si quien las dibujó a ojo acertó (si esa caja es realmente un casco).</li>
+      <li><strong>Fotos casi duplicadas.</strong> Dos copias de la misma escena en splits
+      distintos inflarían la generalización. No se midió; queda como trabajo futuro.</li>
+      <li><strong>El dominio.</strong> Nadie comprobó que toda foto viniera de una obra de
+      construcción.</li>
+    </ol>
+    <p>El tercero falló en la práctica, y la evidencia es la foto del fútbol: en la imagen de un
+    partido, el detector marcó botas sobre los tenis y dibujó una gafa por encima de los ojos. Al
+    barrer las 1,413 imágenes se encontraron 9 pares de botas repetidas y 2 gafas fuera de lugar.
+    La corrección fue solo visual (no repetir cajas solapadas; el re-anclaje de gafas ya no sube
+    tanto): las alertas y las métricas no cambiaron — se volvió a correr la suite para
+    comprobarlo. La lección quedó escrita: el agente es para obras; otros contextos exigen otros
+    datos.</p>
+  </details>
+
+  <details>
+    <summary><strong>3. Métricas del detector (nivel caja)</strong></summary>
+    <p>Precisión, recall y F1 por clase del detector (IoU 0.5), en el punto donde cada clase
+    alcanza su mejor F1. ¿Y la <em>accuracy</em> del detector? En detección no se usa: una imagen
+    tiene muchos objetos a la vez y el fondo acierta solo, así que un accuracy global saldría
+    inflado y no diría nada. La exactitud del agente sí se puede medir bien, por escena: está en
+    la sección 4.</p>
+    <p class="bloque"><strong>Por qué <code>no_boots</code> es lo más difícil de detectar</strong>
+    (y lo sería con cualquier modelo entrenado con este dataset). No es un bug del modelo: es la
+    señal que hubo para aprender. <code>no_boots</code> tiene <strong>115 cajas de las 11,521 del
+    dataset (1%)</strong> — 19.5 veces menos que la clase más común (<code>Person</code>) — y solo
+    <strong>88 de las 1,130 imágenes de train</strong> muestran a alguien sin botas. Encima, la
+    geometría juega en contra: en planos abiertos las botas son de los objetos más pequeños de la
+    foto (la caja mediana ocupa el 1.85% de la imagen, figura 4 de la sección 1) y suelen quedar
+    en el borde inferior, medio fuera de cuadro. Para la evaluación el soporte es tan pequeño (2
+    escenas en val, 6 en test) que un solo acierto o fallo salta la métrica en pasos enormes: el
+    número casi no se puede fiar. Ni el oversampling ×3 probado en el proyecto la arregló
+    (hallazgo negativo documentado en la bitácora). Por eso queda declarada como la clase más
+    débil en vez de maquillada: el agente se mide por escena, y allí el sistema sí cumple
+    (sección 4).</p>
+    <div id="metricas-detector"></div>
+  </details>
+
+  <details>
+    <summary><strong>4. Métricas del agente (nivel escena — las que valen)</strong></summary>
+    <p>El agente acierta o falla <strong>por escena</strong>: si había falta y alertó, acierto
+    (TP); había falta y no alertó, se le escapó (FN); no había falta y alertó, falsa alarma (FP).
+    Con los umbrales reales de operación quedó así:</p>
+    <div id="metricas-agente"></div>
+    <p>Las medidas pre-registradas de la entrega (las mismas M1–M4 de la pestaña de pruebas; el
+    umbral es el objetivo fijado antes de construir el agente — corrida oficial, 5 repeticiones):</p>
+    <div id="metricas-m1m4"></div>
+    <p class="bloque">La idea central del proyecto está en el contraste con la sección 3: el
+    detector falla mucho caja por caja en las faltas (<code>no_boots</code> y <code>no_goggle</code>
+    tienen F1 casi nulo), pero el agente las confirma viéndolas 3 frames seguidos y llega a un F1
+    de escena de 0.92. La confirmación temporal compensa la debilidad del detector.</p>
+  </details>
+</section>
+
+<!-- ============ 6. NOTA DEL DEPLOY ============ -->
+<section id="deploy" class="tab">
+  <p class="intro">Transparencia sobre cómo está hecha esta página y por qué difiere de la que
+  describe el repositorio.</p>
+  <h3>Las dos versiones de la demo</h3>
+  <table class="tabla">
+    <thead><tr><th></th><th>Versión original (el repositorio)</th><th>Esta página pública</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Tecnología</strong></td><td>Python · Gradio · PyTorch (ultralytics)</td><td>HTML/JS estático · ONNX Runtime Web</td></tr>
+      <tr><td><strong>¿Dónde corre el modelo?</strong></td><td>En el servidor (CPU con GPU local para la sesión en vivo)</td><td>En el navegador de cada visitante (WebGPU si está disponible, WASM si no)</td></tr>
+      <tr><td><strong>Modelo</strong></td><td><code>tuned_v2_s/weights/best.pt</code></td><td>El MISMO modelo exportado a ONNX (<code>best.onnx</code>)</td></tr>
+      <tr><td><strong>Lógica del agente</strong></td><td><code>src/safesite/</code> (percepción → razonamiento K=3 → cooldown)</td><td>Reimplementación fiel en JS de la misma lógica, con los mismos parámetros</td></tr>
+      <tr><td><strong>Pruebas M1–M4 en vivo</strong></td><td>Sí — la suite corre en el navegador sobre el servidor</td><td>No (horas en un navegador); se muestran los resultados oficiales</td></tr>
+    </tbody>
+  </table>
+  <h3>Por qué el cambio (solo en el deploy)</h3>
+  <p>El proyecto no cambió: entrenamiento, suite, métricas y código del agente siguen siendo los
+  del repositorio. Lo que pasó es el hospedaje: esta demo necesita ~700 MB de RAM en servidor, y
+  las capas gratuitas con servidor desaparecieron durante el desarrollo (Hugging Face pasó su
+  tier CPU a pago; Claw Cloud empezó a cobrar; Render/Koyek tienen 512 MB, donde el modelo muere
+  por memoria). Los <em>Static Spaces</em> — solo archivos, sin servidor — siguen siendo gratis
+  para siempre, así que la demo pública se reescribió para que el modelo corra del lado del
+  visitante.</p>
+  <h3>Equivalencia verificada (no es una versión «aproximada»)</h3>
+  <p>Antes de publicar se exportó el modelo de despliegue a ONNX y se comparó contra el original
+  en fotos de test: <strong>mismas detecciones, mismas clases</strong>, diferencia máxima de
+  confianza de 0.003–0.018. Los umbrales por clase, la confirmación K=3, el cooldown de 30 s y
+  el re-anclaje visual de gafas se replicaron con los valores exactos de
+  <code>src/safesite/config.py</code>. Las métricas y tablas de esta página son las de la corrida
+  oficial del proyecto, no recalculadas aquí.</p>
+  <p class="pie">El código de ambas versiones está en el repositorio: la original en
+  <code>deploy/app.py</code> (Gradio) y esta en <code>deploy/estatica/</code>. La bitácora del
+  proyecto (<code>Documentation/BITACORA.md</code>, entradas E48–E52) registra la cadena de
+  decisiones, incluidas las plataformas descartadas y sus motivos.</p>
+</section>
+
+<!-- ============ 7. CÓMO PROBAR ============ -->
+<section id="como" class="tab">
+  <h3>Cómo probar el agente (10 a 15 minutos)</h3>
+  <ol>
+    <li><strong>Una foto con falta (el caso típico).</strong> Trae una foto del set de test hasta
+    que salga una con faltas (la página te dice cuáles, según la etiqueta oficial). Procesa y
+    fíjate en las cajas rojas, en la línea de tiempo (la falta se confirma a la tercera vez que
+    se ve) y en el mensaje que le llegaría al supervisor.</li>
+    <li><strong>Una foto sin faltas (el caso control).</strong> Trae más fotos hasta que salga
+    una de control: el agente debería quedarse callado. Las pocas veces que alerte en una escena
+    así son las falsas alarmas que mide M2.</li>
+    <li><strong>El caso de falla del sensor.</strong> En la pestaña «Fallas del sensor»: el agente
+    registra el frame fallido y sigue trabajando. Con el frame negro no hay falla — es una imagen
+    válida sin contenido.</li>
+    <li><strong>Con tu propia cámara.</strong> Activa la webcam: si apareces con la cabeza
+    descubierta en primer plano, lo más probable es que te marque como «SIN CASCO». Aquí la
+    confirmación es real: 3 capturas seguidas (K=3) y cooldown de 30 s.</li>
+    <li><strong>Las pruebas de desempeño.</strong> Lee qué mide cada M1–M4 en su pestaña y
+    compáralas contra los resultados oficiales.</li>
+  </ol>
+  <h3>Qué hace cada parte</h3>
+  <ul>
+    <li>El que ve es el detector (YOLOv8s exportado a ONNX): encuentra cascos, guantes, chalecos,
+    botas, gafas y las faltas <code>no_*</code> en cada imagen — en tu propio navegador.</li>
+    <li>Las decisiones son la lógica propia del proyecto: umbrales por clase, confirmar una falta
+    solo tras verla 3 veces seguidas, y no repetir la misma alerta antes de 30 segundos.</li>
+    <li>La acción arma el mensaje de WhatsApp; en esta página solo se muestra.</li>
+  </ul>
+  <p class="pie">Código, entrenamiento y bitácora del proyecto:
+  <a href="https://github.com/WilliamLzn/SAFESITE-AGENT" target="_blank" rel="noopener">github.com/WilliamLzn/SAFESITE-AGENT</a></p>
+</section>
+
+</main>
+
+<footer>
+  <p>SAFESITE-AGENT — proyecto académico (Universidad Tecnológica de Bolívar). La inferencia de
+  esta página corre en tu navegador; ninguna imagen sale de tu equipo.</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+<script src="datos.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

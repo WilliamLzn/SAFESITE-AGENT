@@ -980,6 +980,22 @@ $env:HF_TOKEN = "hf_xxx"   # token de https://huggingface.co/settings/tokens
 
 ---
 
+### E52 — La vía definitiva: demo estática con el modelo corriendo en el navegador del visitante (HF Static Space) (18-oct)
+
+**Petición del usuario y cierre del inventario de plataformas:** el App de Claw dio 503 y Claw pasó a exigir un "Starter Pack" de $19 para entrar; Azure ya no ofrece tier free sin tarjeta (experiencia del usuario). Con HF-PRO de pago (E48), Render/Koyek en 512 MB donde la app muere con OOM (E51), Oracle/GCP/Fly pidiendo tarjeta y Codespaces dependiendo de encenderlo, la única vía que cumple **gratis + sin tarjeta + URL permanente + sin depender del PC** es un **Static Space de HF** (los únicos que HF mantiene gratis para todos, E48): archivos servidos por CDN, sin servidor que se duerma. Consecuencia arquitectónica: el modelo debe correr **en el navegador del visitante**.
+
+**Factibilidad medida antes de construirse:** export del checkpoint de despliegue a ONNX (`runs/safesite/tuned_v2_s/weights/best.onnx`, 44.8 MB, opset 18). Comparación best.pt vs best.onnx en 3 fotos de test con el mismo umbral (0.15): **mismas detecciones, mismas clases, diferencia máxima conf/caja 0.003–0.018** (ruido del export). `onnx`/`onnxruntime` instalados en el venv.
+
+**Implementado — `deploy/estatica/`:** `index.html` (7 pestañas), `app.js` (motor), `styles.css`, `README.md` del Space (frontmatter `sdk: static`), `generar.py` (assets derivados: modelo, 140 fotos de test + etiquetas oficiales, 6 figuras del EDA, `datos.js` con `metricas_e44.json` + corrida oficial + tabla MD) y `publicar_estatica.py` (HfApi: create_repo static + upload_folder ~75 MB). Lógica replicada EXACTA de `src/safesite/` en JS: umbrales por clase 0.15/0.35, NMS IoU 0.5 por clase, K=3 con racha rota por ausencia, cooldown 30 s por (zona, clase), dedup visual IoU 0.3, re-anclaje de gafas E30/E34 completo y caption de WhatsApp (lote consolidado + INFO). Pestañas: demo (imagen / webcam en vivo con K y cooldown reales / foto de test con veredicto contra la etiqueta oficial), fallas del sensor, M1–M4 explicadas, resultados oficiales, EDA y métricas (figuras + tablas + bloque `no_boots`) y **«Nota del deploy»** (pedido explícito del usuario: documentar en la propia página la tecnología original — Python/Gradio/PyTorch en servidor — frente a la actual — ONNX en el navegador —, el motivo del cambio y la equivalencia verificada).
+
+**Validación sin navegador:** `node --check` OK; **postproceso JS probado contra el tensor real**: sesión onnxruntime sobre la foto `7e05019e…` → salida [1,15,8400] → la MISMA lógica de `app.js` ejecutada en node produce exactamente las detecciones conocidas de esa foto (Person 0.82, helmet 0.87, vest 0.84, gloves 0.54, no_boots 0.18) → argmax, umbrales, des-letterbox y NMS del navegador verificados. Servidor local: index/app/datos/estilos/modelo/fotos/figuras → todos HTTP 200.
+
+**Pendiente:** prueba del usuario en el navegador (servidor local http://localhost:8080 activo) y publicación con un HF_TOKEN nuevo (el anterior quedó expuesto y se pidió revocarlo) → URL permanente `<usuario>-safesite-demo.hf.space`.
+
+**Archivos:** `deploy/estatica/` (nuevo; assets ignorados por git, regenerables), `runs/safesite/tuned_v2_s/weights/best.onnx` (nuevo), venv (+onnx, onnxruntime), `Documentation/BITACORA.md`, `AGENTS.md`, `deploy/README.md`, `Documentation/DESARROLLO_AGENTE.md`.
+
+---
+
 ## 📊 Tabla resumen del EDA (para evaluación rápida)
 
 | Indicador | Valor | Estado |
