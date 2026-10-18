@@ -963,6 +963,23 @@ $env:HF_TOKEN = "hf_xxx"   # token de https://huggingface.co/settings/tokens
 
 ---
 
+### E51 — Experimento decisivo: la app NO cabe en 512 MB (OOM real); Render descartado; diagnóstico del 503 de Claw (18-oct)
+
+**Petición del usuario:** el App de Claw dio **503**; "dejámoslo en Render por favor".
+
+**Experimento (no opinión):** la imagen Docker de la demo corriendo con el límite exacto del free tier de Render (`docker run --memory=512m`): la página arranca y sirve (140 MB en reposo), pero al disparar una verificación real vía la API de Gradio (carga del modelo + 4 inferencias, como haría el evaluador) **el proceso muere con OOM: exit 137, `oom=true`**. Medición del pico real sin límite (mismo contenedor, `/proc/1/status` tras una verificación): **VmHWM 677 MB** (la cifra de 835 MB de E50 era la build CUDA de Windows; Linux+torch-cpu queda en 677).
+
+**Conclusiones:**
+1. **Render free/Starter (512 MB) no es viable para esta app** — el OOM ocurriría frente al evaluador en la primera foto procesada; el primer tier de Render con RAM suficiente (Standard, 2 GB) cuesta $25/mes.
+2. **El 503 del App de Claw es casi seguro esta misma causa**: un App creado con <1 GB de RAM muere al arrancar/usarse y la plataforma responde 503 (o un puerto configurado distinto de 8788). Receta corregida en `deploy/README.md`: **2 GB de RAM (mínimo 1 GB), puerto 8788**.
+3. Requisito real documentado para cualquier host: ≥1 GB de RAM.
+
+**Validación extra:** la verificación real contra el contenedor funcionó de punta a punta por la API de Gradio (`gradio_client` → endpoint `/verificar`, foto de test → 8 componentes de respuesta) — primer test end-to-end de la imagen Docker sirviendo una verificación completa.
+
+**Archivos:** `deploy/README.md` (experimento y receta de recursos), `Documentation/BITACORA.md`, `AGENTS.md`. Imagen de prueba y contenedores de experimento retirados (la imagen `safesite-demo:latest` queda local para el push a Claw).
+
+---
+
 ## 📊 Tabla resumen del EDA (para evaluación rápida)
 
 | Indicador | Valor | Estado |

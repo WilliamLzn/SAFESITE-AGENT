@@ -71,14 +71,24 @@ validada localmente: construye y sirve la página).
    sube lo que cambió).
 4. En Claw Cloud Run: **App List → Create App**, imagen
    `hub.claw.cloud/<TU_USUARIO>/safesite-demo:latest`, recursos
-   **1–2 vCPU y 2 GB de RAM** (la app consume ~0.8 GB), puerto **8788**
+   **1–2 vCPU y 2 GB de RAM** (la app pica a 677 MB al cargar el modelo;
+   con 512 MB muere con OOM), puerto **8788**
    (ya viene configurado en la imagen).
 5. Deploy → URL **https** pública y permanente, con la webcam funcional.
    Cada vez que cambies la página: reconstruir, `push` y redeploy.
 
-Por qué no Render: el free tier da 512 MB de RAM y la app consume
-835–858 MB medidas en CPU (moriría con out-of-memory), y además duerme
-tras 15 min sin visitas.
+Por qué no Render: verificado con un experimento, no con opinión. La
+imagen corriendo con el límite exacto del free tier (512 MB) arranca
+(140 MB en reposo) pero **muere con OOM (exit 137) en cuanto carga el
+modelo** al procesar la primera foto; el pico real medido de la app es
+**677 MB**. El primer tier de Render con RAM suficiente (Standard, 2 GB)
+cuesta $25/mes. Requisito mínimo real de cualquier host: **1 GB de RAM
+(2 GB recomendados)**.
+
+¿Tu App de Claw da 503? Es casi seguro esta misma causa: si el App se
+creó con menos de 1 GB de RAM, el contenedor muere al arrancar o al
+primer uso y la plataforma responde 503. Revisa también que el puerto
+configurado sea el **8788**.
 
 ## Demo en GitHub Codespaces (gratis, para presentaciones puntuales)
 
