@@ -164,7 +164,6 @@ Los detalles completos están en [`Documentation/EDA_SAFESITE_DATASET.md`](Docum
 
 ```
 SAFESITE-AGENT/
-├── AGENTS.md                        # convenciones para agentes de IA que trabajen en el repo
 ├── README.md                        # este documento
 ├── requirements.txt                 # dependencias del entorno de ejecución
 ├── .env.example                     # plantilla de credenciales de WhatsApp (copiar a .env)
@@ -215,18 +214,10 @@ SAFESITE-AGENT/
 │       └── tests.yml                # CI: pytest en cada push y pull request
 ├── runs/                            # artefactos de ejecución (entrenamientos, evidencias)
 └── Documentation/
-    ├── BITACORA.md                  # bitácora de TODAS las ejecuciones (E1 a E54)
     ├── EDA_SAFESITE_DATASET.md      # informe del EDA (hallazgos F1 a F10)
-    ├── ROADMAP_AGENTE.md            # plan de ejecución (Fases 0 a 5)
-    ├── DESARROLLO_AGENTE.md         # desarrollo completo con UML del agente
-    ├── ANALISIS_PRUEBAS.md          # interpretación de la suite de pruebas
-    ├── MATRIZ_DECISION.md           # decisión del proyecto (Fase 1)
-    ├── TABLA_CAMBIOS.md             # cambios del documento de diseño
-    ├── GUION_VIDEO.md               # guion de la presentación
-    ├── ENUNCIADO.md                 # enunciado de la entrega
-    ├── WHATSAPP_LIMITES_COSTOS.md   # límites y costos de la Cloud API
-    ├── SKILLS.md                    # skills de IA instaladas y procedencia
-    └── BITACORA_USO_IA.md           # registro del uso de herramientas de IA
+    ├── BITACORA_USO_IA.md           # registro del uso de herramientas de IA
+    ├── DIAGRAMA_SECUENCIA_OPERACION_NORMAL.md   # UML: sesión de monitoreo con alerta confirmada
+    └── DIAGRAMA_SECUENCIA_FALLOS_Y_ALERTAS.md   # UML: fallas del sensor y degradación del canal
 ```
 
 ---
@@ -363,7 +354,7 @@ La demo completa (Gradio) está publicada en Google Cloud Run y disponible 24/7 
 | Demo desde el propio PC con túnel | `.venv\Scripts\python.exe deploy\demo_publica.py` | emergencia |
 | Variante estática (ONNX en el navegador) | `deploy\estatica\publicar_pages.py` | respaldo en GitHub Pages |
 
-La bitácora (`Documentation/BITACORA.md`, entradas E48 a E56) documenta el diagnóstico completo de plataformas: Hugging Face, Claw Cloud y Render se descartaron con evidencia (cobro, bloqueo silencioso y memoria insuficiente), Modal funcionó y fue retirado al consolidarse Cloud Run, y la solución final usa contenedores de Google Cloud con escala a cero.
+El diagnóstico de plataformas quedó documentado durante el desarrollo: los planes gratuitos con servidor de Hugging Face, Claw Cloud y Render se descartaron con evidencia (cobro, bloqueo silencioso y memoria insuficiente para el modelo, que pica en 677 MB), y la solución final usa contenedores de Google Cloud Run con escala a cero.
 
 ---
 
@@ -371,14 +362,10 @@ La bitácora (`Documentation/BITACORA.md`, entradas E48 a E56) documenta el diag
 
 | Documento | Contenido |
 |---|---|
-| [Documentation/DESARROLLO_AGENTE.md](Documentation/DESARROLLO_AGENTE.md) | Desarrollo completo del agente con diseño, UML y decisiones |
 | [Documentation/EDA_SAFESITE_DATASET.md](Documentation/EDA_SAFESITE_DATASET.md) | Informe del análisis exploratorio de datos (hallazgos F1 a F10) |
-| [Documentation/BITACORA.md](Documentation/BITACORA.md) | Registro de todas las ejecuciones: comandos, semillas y resultados |
-| [Documentation/ROADMAP_AGENTE.md](Documentation/ROADMAP_AGENTE.md) | Plan de ejecución por fases y criterios pre-registrados |
-| [Documentation/ANALISIS_PRUEBAS.md](Documentation/ANALISIS_PRUEBAS.md) | Interpretación de los resultados de la suite |
-| [Documentation/GUION_VIDEO.md](Documentation/GUION_VIDEO.md) | Guion de la presentación del proyecto |
-| [Documentation/WHATSAPP_LIMITES_COSTOS.md](Documentation/WHATSAPP_LIMITES_COSTOS.md) | Límites y costos de WhatsApp Business Cloud API |
-| [AGENTS.md](AGENTS.md) | Convenciones para agentes de IA en este repositorio |
+| [Documentation/DIAGRAMA_SECUENCIA_OPERACION_NORMAL.md](Documentation/DIAGRAMA_SECUENCIA_OPERACION_NORMAL.md) | UML de secuencia: sesión de monitoreo en vivo con alerta confirmada por K=3 y envío por WhatsApp |
+| [Documentation/DIAGRAMA_SECUENCIA_FALLOS_Y_ALERTAS.md](Documentation/DIAGRAMA_SECUENCIA_FALLOS_Y_ALERTAS.md) | UML de secuencia: fallas del sensor y degradación del canal de alertas sin perder incidentes |
+| [Documentation/BITACORA_USO_IA.md](Documentation/BITACORA_USO_IA.md) | Registro del uso de herramientas de IA en el desarrollo |
 
 ---
 
@@ -400,11 +387,11 @@ La bitácora (`Documentation/BITACORA.md`, entradas E48 a E56) documenta el diag
 - Russell, S. J., y Norvig, P. *Artificial Intelligence: A Modern Approach*.
 - Ultralytics: *YOLOv8* y el dataset *Construction PPE*.
 - Meta: *WhatsApp Business Cloud API*.
-- Modal: *serverless cloud para contenedores*.
+- Google Cloud: *Cloud Run, contenedores serverless con escala a cero*.
 - Kassis, T., et al. (2026). *Scientific Agent Skills: A Library of Procedural Knowledge for Research Agents*. arXiv.
 
 ---
 
 ## Nota de transparencia
 
-Este proyecto fue desarrollado con ayuda de agentes de inteligencia artificial (OpenCode y modelos de lenguaje) para análisis de datos, redacción de documentación y depuración de código. Todo el contenido refleja fielmente los archivos del repositorio y los datos reales medidos en los experimentos. La bitácora de uso de IA está en [`Documentation/BITACORA_USO_IA.md`](Documentation/BITACORA_USO_IA.md) y el registro completo de ejecuciones en [`Documentation/BITACORA.md`](Documentation/BITACORA.md).
+Este proyecto fue desarrollado con ayuda de agentes de inteligencia artificial (OpenCode y modelos de lenguaje) para análisis de datos, redacción de documentación y depuración de código. Todo el contenido refleja fielmente los archivos del repositorio y los datos reales medidos en los experimentos. El registro del uso de IA está en [`Documentation/BITACORA_USO_IA.md`](Documentation/BITACORA_USO_IA.md).
