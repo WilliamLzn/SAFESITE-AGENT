@@ -1185,7 +1185,11 @@ def main():
     if args.tema:
         os.environ["SAFESITE_TEMA"] = args.tema
     demo = construir_ui()
-    puerto = int(os.environ.get("SAFESITE_PUERTO", "7860"))
+    # prioridad al puerto explicito del proyecto, luego el PORT estandar de
+    # contenedores (Cloud Run lo inyecta; los contenedores del proyecto lo
+    # traen en ENV), y 7860 para uso local directo
+    puerto = int(os.environ.get("SAFESITE_PUERTO")
+                 or os.environ.get("PORT") or 7860)
     # En el Space hay que escuchar en 0.0.0.0; local, en 127.0.0.1 para que
     # la URL impresa sea abrible en el navegador (0.0.0.0 no se abre).
     # En contenedores (Docker/Claw) también hace falta 0.0.0.0: se marca

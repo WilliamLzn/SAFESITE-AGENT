@@ -34,11 +34,12 @@ COPY eda/salidas/metricas_e44.json eda/salidas/metricas_e44.json
 COPY runs/safesite/tuned_v2_s/weights/best.pt runs/safesite/tuned_v2_s/weights/best.pt
 COPY runs/agente/pruebas runs/agente/pruebas
 
-# sin GPU en estos hosts: inferencia en CPU y escucha pública en 8788
-# (el puerto que Cloud Run espera por defecto)
+# sin GPU en estos hosts: inferencia en CPU y escucha pública. El puerto
+# va en PORT (estándar de contenedores): Modal usa el 8788 que trae la
+# imagen, y Cloud Run pisa PORT con el suyo (8080) en su runtime.
 ENV SAFESITE_DEVICE=cpu \
-    SAFESITE_PUERTO=8788 \
-    SAFESITE_SERVIDOR=publico
+    SAFESITE_SERVIDOR=publico \
+    PORT=8788
 
 EXPOSE 8788
 CMD ["python", "deploy/app.py"]
