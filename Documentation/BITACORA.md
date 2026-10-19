@@ -1041,6 +1041,20 @@ $env:HF_TOKEN = "hf_xxx"   # token de https://huggingface.co/settings/tokens
 
 ---
 
+### E56 — Retiro total de Modal a petición del usuario; Cloud Run queda como única vía pública (19-oct)
+
+**Petición del usuario:** "elimina TODO lo que esté en Modal" y pedir los links de Google Cloud para ver lo creado.
+
+**Hecho:** la app `safesite-demo` ya estaba parada (stopped por el usuario a las 00:00, 0 contenedores); verificado con `modal app list`. Eliminado por completo: token local (`~/.modal.toml`), paquete `modal` del venv y `deploy/modal_app.py` del repositorio (queda en el historial de git y en la bitácora E54). Nota: la CLI de modal 1.6.2 no tiene comando de borrado de apps; el registro "stopped" del dashboard puede eliminarse manualmente en modal.com/apps y el workspace cerrarse en modal.com/settings (el token ya no existe localmente, así que nada puede reactivar la app desde esta máquina).
+
+**Documentación alineada con Cloud Run como única vía pública:** README principal (sección de demo, badge Google Cloud Run en vez de Modal, árbol del repo), `AGENTS.md` (viñeta y mapa), `Documentation/DESARROLLO_AGENTE.md` (§9.9) y `deploy/README.md` (reescrito: Cloud Run activa, app.py propia, estática de respaldo, historial E48-E56).
+
+**Links de la consola para el usuario (proyecto safesite-512105):** consola general, Cloud Run (servicio safesite-ui), Artifact Registry (repositorio safesite), Cloud Build (historial) y la URL pública del servicio.
+
+**Archivos:** `deploy/modal_app.py` (eliminado), `README.md`, `AGENTS.md`, `Documentation/DESARROLLO_AGENTE.md`, `Documentation/BITACORA.md`, `deploy/README.md`.
+
+---
+
 ## 📊 Tabla resumen del EDA (para evaluación rápida)
 
 | Indicador | Valor | Estado |

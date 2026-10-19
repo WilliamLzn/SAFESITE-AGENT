@@ -8,7 +8,7 @@
 ![Gradio](https://img.shields.io/badge/Gradio-6.30-FF7C00?style=for-the-badge&logo=gradio&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.1-000000?style=for-the-badge&logo=flask&logoColor=white)
 ![WhatsApp](https://img.shields.io/badge/WhatsApp-Business_Cloud_API-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)
-![Modal](https://img.shields.io/badge/Modal-Demo_24_7-7B2BF9?style=for-the-badge)
+![Google Cloud Run](https://img.shields.io/badge/Google_Cloud_Run-Demo_24_7-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)
 ![NVIDIA](https://img.shields.io/badge/GPU-RTX_4050-76B900?style=for-the-badge&logo=nvidia&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
 
@@ -202,7 +202,7 @@ SAFESITE-AGENT/
 │       └── banco_vivo.py            # evaluación de perfiles sobre el banco en vivo
 ├── deploy/
 │   ├── app.py                       # demo web Gradio (6 pestañas) para local o servidor
-│   ├── modal_app.py                 # despliegue de esa demo en Modal (24/7, escala a cero)
+│   ├── cloudrun_publicar.py         # publica esa demo en Google Cloud Run (24/7, escala a cero)
 │   ├── Dockerfile                   # imagen Docker de la demo (CPU, validada)
 │   ├── demo_publica.py              # plan de emergencia: demo local + túnel cloudflared
 │   ├── sincronizar_space.py         # historial: armado de paquete para Hugging Face
@@ -342,29 +342,28 @@ python eda\05_complementos.py
 
 ## La demo web pública
 
-La demo completa (Gradio) está publicada y disponible 24/7 con arranque automático:
+La demo completa (Gradio) está publicada en Google Cloud Run y disponible 24/7 con arranque automático:
 
-**https://williamlzn--demo.us-east.modal.run**
+**https://safesite-ui-428834791978.us-central1.run.app**
 
-- La app **duerme** cuando nadie la usa (no consume) y **despierta sola** con la primera visita: la primera carga tarda entre 1 y 3 minutos (carga de PyTorch); luego responde con fluidez.
+- El servicio **duerme** cuando nadie lo usa (gasto cero) y **despierta solo** con la primera visita: la primera carga tarda entre 1 y 3 minutos (carga de PyTorch); luego responde con fluidez.
 - Incluye: demo en vivo (webcam, imágenes propias y fotos del set de test con su etiqueta oficial), fallas del sensor, la suite M1-M4 en vivo, resultados oficiales y el EDA con sus figuras.
-- **Publicar o actualizar** (requiere `pip install modal` y `modal token new` una sola vez):
+- **Publicar o actualizar** (requiere gcloud autenticado y el proyecto `safesite-512105`):
 
 ```powershell
-$env:PYTHONUTF8 = '1'
-.venv\Scripts\python.exe -m modal deploy deploy\modal_app.py
+.venv\Scripts\python.exe deploy\cloudrun_publicar.py --project safesite-512105
 ```
 
 **Alternativas documentadas** (cada una con su evidencia en la bitácora):
 
 | Vía | Comando | Estado |
 |---|---|---|
-| Modal (permanente, escala a cero) | `modal deploy deploy\modal_app.py` | activa |
+| Cloud Run (permanente, escala a cero) | `deploy\cloudrun_publicar.py --project safesite-512105` | activa |
 | Demo local completa | `.venv\Scripts\python.exe deploy\app.py --tema grafito` | http://localhost:7860 |
 | Demo desde el propio PC con túnel | `.venv\Scripts\python.exe deploy\demo_publica.py` | emergencia |
 | Variante estática (ONNX en el navegador) | `deploy\estatica\publicar_pages.py` | respaldo en GitHub Pages |
 
-La bitácora (`Documentation/BITACORA.md`, entradas E48 a E54) documenta el diagnóstico completo de plataformas: los planes gratuitos con servidor de Hugging Face, Claw Cloud y Render se descartaron con evidencia (cobro, bloqueo silencioso y memoria insuficiente), y la solución final usa contenedores on-demand de Modal.
+La bitácora (`Documentation/BITACORA.md`, entradas E48 a E56) documenta el diagnóstico completo de plataformas: Hugging Face, Claw Cloud y Render se descartaron con evidencia (cobro, bloqueo silencioso y memoria insuficiente), Modal funcionó y fue retirado al consolidarse Cloud Run, y la solución final usa contenedores de Google Cloud con escala a cero.
 
 ---
 

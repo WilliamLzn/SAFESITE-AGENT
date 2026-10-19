@@ -1,51 +1,40 @@
----
-title: SafeSite Agent — Demo en vivo
-emoji: 🦺
-colorFrom: blue
-colorTo: orange
-sdk: gradio
-sdk_version: 6.30.0
-app_file: app.py
-pinned: true
----
-
-# SafeSite Agent
+# Deploy de la demo (SafeSite-Agent)
 
 Agente que revisa fotos de obra buscando trabajadores sin su equipo de
-protección. Detecta con YOLO, confirma una falta solo cuando la ve en 3
-frames seguidos y arma el aviso al supervisor por WhatsApp (en esta página
-el aviso solo se muestra, no se envía).
+protección. Detecta con YOLOv8s, confirma una falta solo cuando la ve en 3
+frames seguidos y arma el aviso al supervisor por WhatsApp (en la demo el
+aviso solo se muestra, no se envía).
 
-## Demo pública permanente: la estática (recomendado)
+## Demo pública permanente: Google Cloud Run (activa)
 
-`deploy/estatica/` — el mismo modelo exportado a **ONNX** corre **en el
-navegador del visitante** (ONNX Runtime Web), servido por **GitHub Pages**
-en la rama `gh-pages` del propio repo: gratis para siempre, sin tarjeta,
-sin dormirse. Equivalencia del export verificada contra el original
-(mismas detecciones, Δconf ≤ 0.018). Publicación:
+La demo completa (Gradio, PyTorch en servidor) corre en Cloud Run con
+escala a cero: gasto nulo sin tráfico, despertar automático con la
+primera visita (1 a 3 min la primera carga), URL permanente:
 
-```powershell
-.venv\Scripts\python.exe deploy\estatica\generar.py            # assets (una vez)
-.venv\Scripts\python.exe deploy\estatica\publicar_pages.py     # rama gh-pages
-```
+**https://safesite-ui-428834791978.us-central1.run.app**
 
-Activar Pages una sola vez: **GitHub → SAFESITE-AGENT → Settings → Pages
-→ Branch: gh-pages, / (root) → Save**. URL:
-`https://williamlzn.github.io/SAFESITE-AGENT/`
-
-Prueba local antes de publicar:
+Proyecto: `safesite-512105` (region us-central1). Publicar o actualizar
+(requiere gcloud autenticado y el proyecto con facturación activa):
 
 ```powershell
-.venv\Scripts\python.exe -m http.server 8080 --directory deploy\estatica
-# abrir http://localhost:8080
+.venv\Scripts\python.exe deploy\cloudrun_publicar.py --project safesite-512105
 ```
 
-## Versión con servidor: app.py (Gradio)
+El publicador arma un staging limpio (solo lo que copia el Dockerfile:
+sin .venv ni dataset crudo), construye en Cloud Build, guarda la imagen
+en Artifact Registry y despliega con min-instances=0, max=1, 2 GiB,
+timeout 900, cpu-boost y allow-unauthenticated. Borrado al terminar la
+evaluación:
 
-`deploy/app.py` es la versión completa (suite M1–M4 corriendo en vivo,
-webcam, fallas del sensor). Necesita un servidor Python con ~700 MB de
-RAM (pico medido 677 MB). Úsala en local (GPU disponible), en Codespaces
-para una presentación puntual o en cualquier VPS propio:
+```powershell
+gcloud run services delete safesite-ui --region=us-central1
+```
+
+## Versión con servidor propia: app.py (Gradio)
+
+`deploy/app.py` es la misma demo para correr donde se quiera (local con
+GPU, un VPS propio, Codespaces). Escucha el puerto de `PORT` y la IP
+`0.0.0.0` dentro de contenedores:
 
 ```powershell
 .venv\Scripts\python.exe deploy\app.py --tema grafito
@@ -54,18 +43,20 @@ para una presentación puntual o en cualquier VPS propio:
 El color se elige con `--tema` o la variable `SAFESITE_TEMA`:
 `esmeralda` (default), `grafito`, `rosa`, `ambar`, `azul`, `ocean`, `neon`.
 
-## Por qué no las plataformas "gratis" con servidor
+## Respaldo estático (ONNX en el navegador)
 
-Cada intento quedó documentado en la bitácora (E48–E51): Hugging Face pasó
-su tier CPU a suscripción PRO (error 402 al publicar); Claw Cloud empezó
-a exigir un plan de pago para entrar; Render/Koyek ofrecen 512 MB y la
-app muere con OOM en la primera verificación (verificado con el límite
-exacto de memoria); Azure ya no tiene capa free sin tarjeta. La imagen
-Docker validada (`deploy/Dockerfile`) queda lista por si alguna de ellas
-vuelve a ser viable.
+`deploy/estatica/` sirve la demo sin servidor: el modelo exportado a
+ONNX corre en el navegador del visitante (GitHub Pages, rama `gh-pages`,
+con `publicar_pages.py`). Equivalencia del export verificada contra el
+original (mismas detecciones, Δconf ≤ 0.018).
 
-## Emergencia: demo desde el PC
+## Historial de hospedaje (por qué Cloud Run)
 
-`deploy/demo_publica.py` sirve la versión Gradio desde el propio PC con
-un túnel cloudflared (E48). Depende del PC encendido; no es la vía
-recomendada.
+Cada intento quedó documentado en la bitácora (E48 a E56): Hugging Face
+cobró su tier con servidor y su static Space resultó bloqueado en
+cuentas free; Claw Cloud pasó a cobrar; Render/Koyek no tienen RAM (la
+app pica a 677 MB y muere con OOM a los 512 MB); Azure ya no tiene capa
+free sin tarjeta; Modal funcionó (E54) y fue retirado al consolidarse
+Cloud Run (E56, pedido del usuario). La imagen Docker validada
+(`deploy/Dockerfile`) es la misma que corrió en Modal y la que hoy sirve
+en Cloud Run.

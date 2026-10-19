@@ -191,7 +191,7 @@ El análisis completo (una página: causas del caso límite S5 y propuestas de c
 ## 9.9 Enlaces
 
 - **Repositorio:** `https://github.com/WilliamLzn/SAFESITE-AGENT`
-- **Demo pública (Gradio completa, permanente):** desplegada en **Modal** con escala a cero: `https://williamlzn--demo.us-east.modal.run` (despierta sola con la primera visita; duerme tras 2 min sin uso). Despliegue y comandos en `deploy/modal_app.py` y `deploy/README.md`.
+- **Demo pública (Gradio completa, permanente):** desplegada en **Google Cloud Run** (proyecto `safesite-512105`): `https://safesite-ui-428834791978.us-central1.run.app` — escala a cero: duerme sin tráfico y despierta sola con la primera visita (1 a 3 min la primera carga). Despliegue con `deploy/cloudrun_publicar.py`; presupuesto de US$5 con alerta como red de seguridad.
 - **Demo alternativa (estática):** `deploy/estatica/` servible en GitHub Pages (rama `gh-pages`): el modelo exportado a ONNX corre en el navegador del visitante; equivalencia verificada (diferencias ≤0.018 en test).
 - **Demo completa en servidor propio:** `deploy/app.py` — con la suite corriendo en vivo, para sesión local con GPU o Codespaces.
 - **Logs de las pruebas:** `runs/agente/pruebas/` (JSONL + CSV + JSON + tabla Markdown)
