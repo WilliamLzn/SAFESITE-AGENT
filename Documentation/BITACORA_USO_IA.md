@@ -4,7 +4,7 @@
 
 | Herramienta | Uso que se le dio |
 |---|---|
-| OpenCode (agente de código, modelos de lenguaje GLM) | Asistente de programación durante gran parte del desarrollo del proyecto: EDA del dataset, re-split oficial, scripts de entrenamiento YOLO, núcleo del agente (`src/safesite/`), integración con WhatsApp Cloud API, panel web, suite de pruebas, aplicación de demostración con su contenedor Docker y publicación en la nube, y documentación técnica |
+| OpenCode (agente de código) | Asistente de programación durante gran parte del desarrollo del proyecto: EDA del dataset, re-split oficial, scripts de entrenamiento YOLO, núcleo del agente (`src/safesite/`), integración con WhatsApp Cloud API, panel web, suite de pruebas, aplicación de demostración con su contenedor Docker y publicación en la nube, y documentación técnica |
 | Ultralytics YOLOv8 | **Componente del agente**, no herramienta de asistencia: red de detección entrenada por nosotros (épocas y semilla fijas, dataset Construction PPE) |
 
 **No se usaron LLM** en ninguna parte del ciclo de decisión del agente: el razonamiento (umbrales por clase, confirmación temporal K=3, cooldown, consolidación de alertas en lote) está implementado con reglas deterministas escritas por nosotros en `src/safesite/razonamiento.py`.
