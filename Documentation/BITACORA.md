@@ -1010,6 +1010,23 @@ $env:HF_TOKEN = "hf_xxx"   # token de https://huggingface.co/settings/tokens
 
 ---
 
+### E54 — La demo Gradio completa queda 24/7 en Modal (escala a cero); README del repo reescrito (19-oct)
+
+**Petición del usuario:** dejar la demo en un lugar independiente del PC; Modal resultó con $1/mes de crédito sin tarjeta.
+
+**Tres hallazgos encadenados (todos con los logs del usuario como evidencia):**
+1. **Modal re-importa el módulo dentro del contenedor** para hidratar la función: el armado del staging a nivel de módulo crasheaba en el contenedor (FileNotFoundError del Dockerfile) y moría en loop. Fix: construir la imagen solo cuando el repo exista en disco (cliente) y pasar sin ella en el contenedor.
+2. **`subprocess.run` bloquea; con `@web_server` hay que lanzar con `subprocess.Popen` y retornar.** El log lo demostró: la app llegó a `Running on local URL: http://0.0.0.0:8788` y Modal la mataba a los 300 s por "runner initializing for too long". Con Popen la función retorna y Modal monitorea el puerto. Tras el fix la página cargó completa (200 en /, assets, heartbeat).
+3. **La verificación en bucle quemó crédito:** cada request impaciente arrancaba contenedores paralelos ($0.36 de $1.00 en arranques que nunca sirvieron nada). Fix: `max_containers=1` y lección registrada: verificar con UNA request paciente, nunca en loop; un error puntual del proxy (respuesta de config cortada) se autogestionó en el arranque siguiente.
+
+**Estado final:** **https://williamlzn--demo.us-east.modal.run** activa y verificada por el usuario. Despertar en frío de 1 a 3 min (torch en CPU de 2 vCPU, 2 GiB); duerme tras 120 s sin visitas (gasto cero); un solo contenedor máximo. Comandos y plan de paro documentados en `deploy/README.md`.
+
+**README del repositorio reescrito** (pedido explícito del usuario): índice linkeado con anclas, badges de shields.io de las tecnologías, contexto del proyecto, arquitectura, resultados M1-M4, dataset y EDA, árbol del repositorio, instalación y ejecución paso a paso, CI, demo pública y documentación. Restricción de caracteres aplicada y auditada por script: solo tildes y ñ, y │├└─ únicamente para el árbol (cero emojis, flechas o símbolos tipográficos).
+
+**Archivos:** `README.md` (reescrito), `deploy/modal_app.py` (guard de cliente + Popen + max_containers), `Documentation/BITACORA.md`, `AGENTS.md`, `Documentation/DESARROLLO_AGENTE.md` (§9.9 con la URL de Modal).
+
+---
+
 ## 📊 Tabla resumen del EDA (para evaluación rápida)
 
 | Indicador | Valor | Estado |
