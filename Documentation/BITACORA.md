@@ -1027,6 +1027,20 @@ $env:HF_TOKEN = "hf_xxx"   # token de https://huggingface.co/settings/tokens
 
 ---
 
+### E55 — La demo también queda desplegada en Google Cloud Run (plan del usuario verificado y ejecutado) (19-oct)
+
+**Petición del usuario:** probar Google Cloud Run como alternativa a Modal ("más ágil"), con un plan externo verificado (Docker, PORT, 0.0.0.0, escala a cero, webhook separado como opcional).
+
+**Verificación del plan contra el repo:** el 80 % ya existía — `deploy/Dockerfile` (imagen CPU validada E50/E51), `.dockerignore`, escucha `0.0.0.0` (`SAFESITE_SERVIDOR=publico`), checkpoint dentro de la imagen. Faltaba el estándar `PORT`: `app.py` ahora lo lee como fallback y el Dockerfile lo usa en vez de `SAFESITE_PUERTO` (Cloud Run pisa `PORT=8080` en su runtime; Modal sigue usando el 8788 de la imagen sin cambios). Validado localmente: contenedor con `-e PORT=8099` sirve HTTP 200.
+
+**Ejecución:** `deploy/cloudrun_publicar.py` arma el staging limpio (mismo patrón de Modal/Pages: sin .venv ni dataset crudo) y corre `gcloud builds submit` + `gcloud run deploy`. Dos bugs propios corregidos en el camino: gcloud en Windows es un `.cmd` y CreateProcess no lo lanza directo (fix: `cmd /c`), y `RAIZ` quedó un nivel por encima del repo (fix: un solo `dirname`; hallazgo comparativo: `modal_app.py` parte del ARCHIVO con `abspath(__file__)` y por eso su doble `dirname` es correcto, mientras partir de la CARPETA exige uno). Instalación de gcloud vía winget (ID correcto: `Google.CloudSDK`), `gcloud auth login` (wlozanojunior@gmail.com), proyecto `safesite-512105`.
+
+**Resultado:** build SUCCESS en Cloud Build (609 archivos, 53.2 MB, 4 min 10 s) e imagen en Artifact Registry (`us-central1-docker.pkg.dev/safesite-512105/safesite/safesite-ui`). Desplegado como `safesite-ui` con `--min-instances=0 --max-instances=1 --memory=2Gi --cpu=2 --timeout=900 --cpu-boost --allow-unauthenticated`. **URL: https://safesite-ui-428834791978.us-central1.run.app** (permanente; escala a cero con cold start de 1-3 min igual que Modal — el cuello es cargar torch en CPU, no la plataforma). Presupuesto de US$5 configurado por el usuario como red de seguridad; borrado del servicio al terminar la evaluación con `gcloud run services delete safesite-ui`.
+
+**Archivos:** `deploy/cloudrun_publicar.py` (nuevo), `deploy/app.py` (+PORT), `deploy/Dockerfile` (PORT), `Documentation/BITACORA.md`.
+
+---
+
 ## 📊 Tabla resumen del EDA (para evaluación rápida)
 
 | Indicador | Valor | Estado |

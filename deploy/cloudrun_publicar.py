@@ -25,7 +25,7 @@ import sys
 import tempfile
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-RAIZ = os.path.dirname(os.path.dirname(AQUI))
+RAIZ = os.path.dirname(AQUI)                 # deploy/ -> raiz del repo
 STAGING = os.path.join(tempfile.gettempdir(), "safesite_cloudrun_build")
 
 # lo que entra al contexto de build (lo mismo que copia el Dockerfile)
@@ -48,6 +48,10 @@ COPIAS = [
 
 
 def _run(cmd, cwd=None):
+    # gcloud en Windows es un .cmd y CreateProcess no lo lanza directo:
+    # hay que pasar por cmd.exe (con /c) para que resuelva el PATHEXT
+    if os.name == "nt":
+        cmd = ["cmd", "/c"] + cmd
     print("  $ " + " ".join(cmd), flush=True)
     r = subprocess.run(cmd, cwd=cwd)
     if r.returncode != 0:
@@ -95,9 +99,13 @@ def main():
     print("1/3 habilitando APIs y creando el repositorio de imagenes...")
     _run(["gcloud", "services", "enable", "run.googleapis.com",
           "cloudbuild.googleapis.com", "artifactregistry.googleapis.com"])
-    _run(["gcloud", "artifacts", "repositories", "create", "safesite",
-          "--repository-format=docker", "--location", args.region],
-         cwd=STAGING)
+    # el repositorio puede existir de corridas anteriores: no es error
+    r = subprocess.run(
+        ["cmd", "/c", "gcloud", "artifacts", "repositories", "create",
+         "safesite", "--repository-format=docker", "--location", args.region],
+        capture_output=True, text=True)
+    if r.returncode != 0 and "already exists" not in (r.stdout + r.stderr):
+        sys.exit(f"ERROR creando el repositorio:\n{r.stderr}")
 
     print("2/3 construyendo la imagen en Cloud Build (~75 MB de subida)...")
     _armar_staging()
