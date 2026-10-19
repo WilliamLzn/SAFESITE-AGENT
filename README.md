@@ -99,6 +99,8 @@ El incumplimiento en el uso de EPP es una de las principales causas de accidenta
 - **Webhook conversacional:** el supervisor responde **INFO** y recibe la métrica técnica del incidente. El circuito completo (webhook, túnel HTTPS y auto-registro en Meta) arranca con un solo comando (`piloto.py`).
 - **Panel web en vivo (Flask + MJPEG):** video anotado en tiempo real, tarjetas de EPP por clase, log de incidentes y botones para pausar WhatsApp o forzar una alerta.
 
+Los dos flujos completos, mensaje por mensaje, están en los diagramas de secuencia UML del repositorio: [operación normal](Documentation/DIAGRAMA_SECUENCIA_OPERACION_NORMAL.md) (confirmación con K=3, cooldown y envío de la alerta con foto) y [fallas del sensor y degradación del canal](Documentation/DIAGRAMA_SECUENCIA_FALLOS_Y_ALERTAS.md) (frames inválidos, excepciones de percepción, límites del canal y fallas de WhatsApp sin perder incidentes).
+
 ---
 
 ## Resultados medidos
@@ -325,7 +327,7 @@ python eda\05_complementos.py
 
 ## Pruebas y CI
 
-- **Suite de desempeño** (`src/safesite/pruebas_medidas.py`): las 4 medidas pre-registradas M1 a M4, con 13 escenarios (normales, límite y de falla) por 5 repeticiones, mas M1 y M2 sobre las 283 escenas de validación y test. Los logs quedan en `runs/agente/pruebas/` (JSONL, CSV, JSON y tabla Markdown).
+- **Suite de desempeño** (`src/safesite/pruebas_medidas.py`): las 4 medidas pre-registradas M1 a M4, con 13 escenarios (normales, límite y de falla) por 5 repeticiones, mas M1 y M2 sobre las 283 escenas de validación y test. Los logs de la corrida oficial quedan versionados en el repositorio en `runs/agente/pruebas/` y en `eda/salidas/pruebas_fase3/` (JSONL por fotograma, CSV, JSON y tabla Markdown de la corrida 20261014_170459).
 - **Pruebas del núcleo** (`tests/test_nucleo.py`): 13 pruebas que validan la lógica del agente sin modelo ni dataset (confirmación K=3, rachas, umbrales por clase, coherencia, cooldown, contención, re-anclaje de gafas, frames inválidos).
 - **Integración continua** (`.github/workflows/tests.yml`): GitHub Actions corre pytest en cada push y pull request.
 
@@ -375,7 +377,7 @@ El diagnóstico de plataformas quedó documentado durante el desarrollo: los pla
 |---|---|
 | **Universidad** | Universidad Tecnológica de Bolívar |
 | **Programa** | Ingeniería en Sistemas y Computación |
-| **Presentado por** | William David Lozano Julio, T00078475 |
+| **Presentado por** | William David Lozano Julio (T00078475) y Cristian Matteo Benitez Montes (T00078658) |
 | **Curso** | Inteligencia Artificial |
 | **Docente** | Edwin Alexander Puertas Del Castillo |
 | **Periodo** | Agosto a octubre de 2026 |
