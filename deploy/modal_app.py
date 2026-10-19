@@ -77,7 +77,10 @@ app = modal.App("safesite-demo")
 @modal.web_server(8788, startup_timeout=600, label="demo")
 def servir():
     """Arranca la página Gradio dentro del contenedor (la imagen ya trae
-    todo; escucha 0.0.0.0:8788 por sus ENV). Bloquea: el contenedor vive
-    mientras la app viva, y duerme tras 5 min sin visitas."""
+    todo; escucha 0.0.0.0:8788 por sus ENV). Popen NO bloquea: la
+    función retorna enseguida y Modal monitorea el puerto hasta que la
+    app escuche (torch tarda ~1-2 min en cargar). Con subprocess.run la
+    función nunca retornaba y Modal mataba el contenedor por 'startup
+    demasiado largo' — el patrón con @web_server es lanzar y retornar."""
     import subprocess
-    subprocess.run(["python", "deploy/app.py"], cwd="/app", check=False)
+    subprocess.Popen(["python", "deploy/app.py"], cwd="/app")
