@@ -19,16 +19,19 @@ el aviso solo se muestra, no se envía).
 ## Demo pública permanente: la estática (recomendado)
 
 `deploy/estatica/` — el mismo modelo exportado a **ONNX** corre **en el
-navegador del visitante** (ONNX Runtime Web), servido como **Hugging Face
-Static Space**: gratis para siempre, sin tarjeta, sin dormirse, URL
-permanente. Equivalencia del export verificada contra el original
+navegador del visitante** (ONNX Runtime Web), servido por **GitHub Pages**
+en la rama `gh-pages` del propio repo: gratis para siempre, sin tarjeta,
+sin dormirse. Equivalencia del export verificada contra el original
 (mismas detecciones, Δconf ≤ 0.018). Publicación:
 
 ```powershell
 .venv\Scripts\python.exe deploy\estatica\generar.py            # assets (una vez)
-$env:HF_TOKEN = "hf_xxx"                                        # token de escritura
-.venv\Scripts\python.exe deploy\estatica\publicar_estatica.py --repo-id TU_USUARIO/safesite-demo
+.venv\Scripts\python.exe deploy\estatica\publicar_pages.py     # rama gh-pages
 ```
+
+Activar Pages una sola vez: **GitHub → SAFESITE-AGENT → Settings → Pages
+→ Branch: gh-pages, / (root) → Save**. URL:
+`https://williamlzn.github.io/SAFESITE-AGENT/`
 
 Prueba local antes de publicar:
 

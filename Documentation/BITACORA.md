@@ -996,6 +996,20 @@ $env:HF_TOKEN = "hf_xxx"   # token de https://huggingface.co/settings/tokens
 
 ---
 
+### E53 — El deploy de la estática: dos hallazgos — el .gitignore remoto que filtraba subidas, y el bloqueo silencioso de HF a las cuentas free → GitHub Pages (18/19-oct)
+
+**Petición del usuario:** la estática publicada en HF "no carga nada, no se ve nada"; quiere arreglarla o volver.
+
+**Hallazgo 1 — el `.gitignore` del repo de HF filtra las subidas por API.** Primera publicación del usuario: el `colorTo: orange` del frontmatter dio un 400 en validate-yaml (corregido a `yellow`), pero tras re-publicar el Space seguía sirviendo 404 total. Diagnóstico con evidencia: el árbol del Space tenía 153 archivos PERO **`datos.js` faltaba siempre** — y los commits "reparación: datos.js" aparecían en la historia con **"Files changed (0)"**: el servidor de HF aplica el `.gitignore` presente en el repo (subido en el primer intento, con el patrón exacto `datos.js`) y descarta el archivo **silenciosamente** en cada subida, incluso en `upload_file` individuales. Borrado el `.gitignore` remoto → `datos.js` subió al instante (`list_repo_files` ✓, `resolve` HTTP 200 ✓). Corrección estructural en el publicador: staging fuera del repo y sin `.gitignore`, `allow_patterns` explícito y **verificación post-subida** (imprescindibles + 140 fotos + 6 figuras) — la verificación detectó el fallo antes que ningún navegador. Lección: nunca subir el `.gitignore` del proyecto a un repo de HF; verificar siempre el estado remoto tras publicar.
+
+**Hallazgo 2 — HF bloquea el despliegue de los static Spaces en cuentas free.** Con el repo íntegro y servible por `resolve` (index/app/datos/modelo todos HTTP 200), el subdominio del Space (`…-safesite-demo.hf.space`) respondía **404 en todo** con la página del Space clavada en **"Refreshing"** para siempre. Se probó: esperas (2 s→8 min), cache-busters, `restart_space` (imposible: *"Can't restart a static Space"*), y **recrear el Space de cero** con una subida limpia verificada — mismo resultado exacto. Conclusión experimental: el CDN de los static Spaces no despliega para cuentas gratuitas, contradiciendo el propio mensaje del error 402 ("Static Spaces are free for everyone"). HF queda descartado por completo (tercera y última vía de HF probada).
+
+**Solución — GitHub Pages:** la estática no depende de HF para nada; `deploy/estatica/publicar_pages.py` publica una rama huérfana `gh-pages` con SOLO el sitio (index, app, datos, modelo ONNX 44.7 MB, 140 fotos, 6 figuras) en el propio repo del proyecto → **https://williamlzn.github.io/SAFESITE-AGENT/** tras activar Pages una vez (Settings → Pages → gh-pages / root). GitHub Pages es parte del core de GitHub: gratis para siempre, sin tarjeta, sin promociones que caduquen ni soft-locks. `publicar_estatica.py` (la vía HF) se elimina; el sitio local se prueba con `python -m http.server 8080 --directory deploy\estatica`.
+
+**Archivos:** `deploy/estatica/publicar_pages.py` (nuevo), `deploy/estatica/publicar_estatica.py` (eliminado), `deploy/estatica/README.md` (frontmatter solo para HF → readme simple del sitio), `Documentation/BITACORA.md`, `AGENTS.md`, `deploy/README.md`, `Documentation/DESARROLLO_AGENTE.md`. El Space de HF `WilliamLzn/safesite-demo` fue borrado tras los experimentos.
+
+---
+
 ## 📊 Tabla resumen del EDA (para evaluación rápida)
 
 | Indicador | Valor | Estado |

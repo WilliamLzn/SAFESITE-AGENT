@@ -191,6 +191,6 @@ El análisis completo (una página: causas del caso límite S5 y propuestas de c
 ## 9.9 Enlaces
 
 - **Repositorio:** `https://github.com/WilliamLzn/SAFESITE-AGENT`
-- **Demo pública (estática, permanente):** `deploy/estatica/` publicada en un Hugging Face *Static Space* — el modelo exportado a ONNX corre en el navegador del visitante; URL: `https://<usuario>-safesite-demo.hf.space` (se registra al publicar, E52). La página incluye una «Nota del deploy» que explica esta versión frente a la original.
+- **Demo pública (estática, permanente):** `deploy/estatica/` servida por **GitHub Pages** (rama `gh-pages`): `https://williamlzn.github.io/SAFESITE-AGENT/` — el modelo exportado a ONNX corre en el navegador del visitante; equivalencia verificada (diferencias ≤0.018 en test). La página incluye la «Nota del deploy» que explica esta versión frente a la original.
 - **Demo completa (Gradio + PyTorch, servidor):** `deploy/app.py` — versión con la suite corriendo en vivo, para sesión local con GPU o Codespaces.
 - **Logs de las pruebas:** `runs/agente/pruebas/` (JSONL + CSV + JSON + tabla Markdown)

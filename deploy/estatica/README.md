@@ -1,30 +1,41 @@
----
-title: SafeSite Agent — Demo en vivo
-emoji: 🦺
-colorFrom: blue
-colorTo: yellow
-sdk: static
-pinned: true
----
+# Demo estática (`deploy/estatica/`)
 
-# SafeSite Agent — demo en vivo
+La demo pública del proyecto: el modelo de despliegue exportado a ONNX
+corre **en el navegador del visitante** (ONNX Runtime Web), con la lógica
+del agente replicada en JS desde `src/safesite/` (umbrales por clase,
+K=3, cooldown, re-anclaje de gafas, mensaje de WhatsApp solo mostrado).
 
-Agente de monitoreo de EPP en obra: detecta con YOLOv8s, confirma una
-falta solo cuando la ve en 3 frames seguidos y arma el aviso al
-supervisor por WhatsApp (aquí el aviso solo se muestra, no se envía).
+## Publicación
 
-En este Space la demo es **estática**: el modelo (exportado a ONNX) se
-descarga una vez y corre **en tu navegador** con ONNX Runtime Web —
-ninguna imagen sale de tu equipo. El proyecto original corre en Python
-en servidor (Gradio + PyTorch, `deploy/app.py` en el repositorio); esta
-versión existe porque los Static Spaces son los únicos que Hugging Face
-mantiene gratis. La equivalencia del modelo exportado está verificada
-(mismas detecciones en el set de test).
+Se sirve por **GitHub Pages** (gratis para siempre, sin tarjeta) en la
+rama `gh-pages` del propio repo:
 
-- Demo: subir imagen, webcam en vivo (K=3 y cooldown reales), fotos del
-  set de test con su etiqueta oficial y fallas del sensor.
-- Resultados oficiales de la suite (M1–M4) y EDA del dataset.
-- Nota del deploy con la comparación de tecnologías.
+- `generar.py` — produce los assets (modelo, 140 fotos de test con sus
+  etiquetas, figuras del EDA, `datos.js` con las métricas reales).
+- `publicar_pages.py` — arma el staging, hace commit a la rama `gh-pages`
+  y la empuja. La activación de Pages es una vez:
+  **Settings → Pages → Branch: gh-pages, / (root) → Save**.
 
-Código, entrenamiento y bitácora del proyecto:
-[github.com/WilliamLzn/SAFESITE-AGENT](https://github.com/WilliamLzn/SAFESITE-AGENT)
+URL resultante: `https://williamlzn.github.io/SAFESITE-AGENT/`
+
+## Prueba local
+
+```powershell
+.venv\Scripts\python.exe deploy\estatica\generar.py
+.venv\Scripts\python.exe -m http.server 8080 --directory deploy\estatica
+# abrir http://localhost:8080
+```
+
+## Historial de hospedaje (por qué Pages)
+
+La búsqueda de un hosting gratuito permanente quedó documentada en la
+bitácora (E48–E53): HF cobró su tier con servidor y luego su static Space
+resultó bloqueado en cuentas free ("Refreshing" eterno, verificado
+recreándolo de cero); Claw Cloud pasó a cobrar; Render/Koyek no tienen
+RAM para la app con servidor (pico medido 677 MB, OOM a los 512 MB);
+Azure ya no tiene capa free sin tarjeta. La estática + GitHub Pages es
+la única combinación gratis, sin tarjeta, permanente y sin
+dependencias de promociones.
+
+Los assets (`modelo/`, `fotos/`, `figuras/`, `datos.js`) no se versionan
+en `main`: se regeneran con `generar.py` y los sube `publicar_pages.py`.
