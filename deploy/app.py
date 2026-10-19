@@ -776,8 +776,7 @@ def construir_ui():
             with gr.Row():
                 btn_b = gr.Button("Correr los 13 escenarios × 5 repeticiones",
                                   variant="primary")
-                btn_a = gr.Button("Correr M1 y M2 sobre todos los escenarios "
-                                  "(tarda, pero vale la pena)",
+                btn_a = gr.Button("Correr M1 y M2 sobre todos los escenarios",
                                   variant="secondary")
             estado_b = gr.Markdown("")
             tabla_b = gr.Dataframe(
@@ -1050,8 +1049,8 @@ def construir_ui():
                 else:
                     gr.Markdown("_(no se encontró "
                                 "`eda/salidas/metricas_e44.json`)_")
-            with gr.Accordion("4. Métricas del agente (nivel escena — las "
-                              "que valen)", open=False):
+            with gr.Accordion("4. Métricas del agente (nivel escena)",
+                              open=False):
                 if metricas:
                     ag = metricas["agente_escena"]
                     gr.Markdown(
