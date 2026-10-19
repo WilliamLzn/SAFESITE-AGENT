@@ -56,16 +56,25 @@ def _armar_staging():
     return STAGING
 
 
-_armar_staging()
-
-imagen = modal.Image.from_dockerfile(
-    os.path.join(STAGING, "Dockerfile"), context_dir=STAGING)
+# La imagen se construye SOLO en la máquina del cliente (donde existe el
+# repo). Modal vuelve a importar este módulo DENTRO del contenedor para
+# hidratar la función, y allí no existen ni el repo ni el staging: sin
+# este guard, el import crashea y el contenedor muere en loop.
+imagen = None
+if os.path.exists(os.path.join(RAIZ, "deploy", "Dockerfile")):
+    _armar_staging()
+    imagen = modal.Image.from_dockerfile(
+        os.path.join(STAGING, "Dockerfile"), context_dir=STAGING)
 
 app = modal.App("safesite-demo")
 
 
-@app.function(image=imagen, memory=2048, cpu=2, scaledown_window=120)
-@modal.web_server(8788, startup_timeout=300, label="demo")
+# max_containers=1: NUNCA se crean contenedores en paralelo (una sola
+# instancia sirve todo; sin esto, cada request impaciente puede abrir
+# contenedores extra y quemar crédito en arranques que no sirven nada).
+@app.function(image=imagen, memory=2048, cpu=2, scaledown_window=120,
+               max_containers=1)
+@modal.web_server(8788, startup_timeout=600, label="demo")
 def servir():
     """Arranca la página Gradio dentro del contenedor (la imagen ya trae
     todo; escucha 0.0.0.0:8788 por sus ENV). Bloquea: el contenedor vive
