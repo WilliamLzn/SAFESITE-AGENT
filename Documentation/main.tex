@@ -1,0 +1,81 @@
+\documentclass[conference,spanish]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{babel}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{ragged2e}
+\usepackage{amsmath}
+
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{P}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+
+\title{Propuesta de proyecto: SAFESITE V2\\
+\small Hito 1 -- Problema, ruta, datos y medidas de desempeño}
+
+\author{
+\IEEEauthorblockN{William David Lozano Julio \hspace{0.4em}--\hspace{0.4em} T00078475 \\
+Cristian Matteo Benitez Montes \hspace{0.4em}--\hspace{0.4em} T00078658}
+\IEEEauthorblockA{Curso de Inteligencia Artificial -- Universidad de Cartagena\\
+Profesor: Edwin Puerta}
+}
+\date{3 de noviembre de 2026}
+
+\begin{document}
+\maketitle
+
+\section{Problema y usuario}
+En las empresas de construcción, el supervisor de seguridad y salud en el trabajo (HSE) necesita saber quién ingresa a la obra, si está registrado en la nómina, cuándo inicia y termina su jornada y si utiliza el Equipo de Protección Personal (EPP) requerido para su puesto. Actualmente, estas tareas pueden realizarse mediante registros manuales y controles separados. Esto dificulta consolidar asistencia, puntualidad, horas trabajadas e incidentes de seguridad en un mismo flujo.
+
+Se propone \textbf{SAFESITE V2}, una evolución del agente original de detección de EPP hacia un gestor y verificador de nómina LIVE. El usuario principal es el supervisor HSE o encargado de obra. El sistema debe identificar al trabajador mediante badge/QR o selección manual, validar su registro, marcar entrada y salida, calcular horas trabajadas y generar reportes agregados en PDF y WhatsApp. No se utilizará reconocimiento facial ni se tomarán decisiones salariales irreversibles sin revisión humana.
+
+\section{Ruta de IA elegida y arquitectura}
+La ruta principal es la \textbf{E: agente con herramientas}. El Agente 1, de Nómina e Identificación, utiliza un LLM con herramientas para consultar empleados y turnos, registrar asistencia, verificar puntualidad, calcular horas y solicitar reportes. Los cálculos numéricos y las reglas laborales permanecen deterministas para facilitar la auditoría.
+
+La Ruta F, visión por computador, funciona como apoyo mediante el Agente 2 de Verificación de EPP. Este agente utiliza YOLOv8s y confirmación temporal de $K=3$ frames para comprobar el EPP requerido por el puesto. El orden es secuencial:
+\[
+\text{identificación y nómina} \rightarrow \text{entrada} \rightarrow \text{EPP} \rightarrow \text{salida} \rightarrow \text{reporte}.
+\]
+
+Si el trabajador no existe en la nómina, se registra el intento no autorizado y se genera una alerta. Si existe, el Agente 1 registra la entrada y el Agente 2 verifica el EPP. La falta de EPP genera un incidente y una observación, pero no sustituye la validación de identidad ni bloquea automáticamente la entrada. El proyecto se organizará con CRISP-ML(Q): comprensión del negocio y los datos, preparación, modelado, evaluación, despliegue y control continuo de calidad.
+
+\section{Datos, origen y licencia}
+La solución utilizará dos fuentes de datos. Para el Agente 2 se empleará el dataset oficial \emph{Construction-PPE} de Ultralytics, con 1,416 imágenes y 11 clases relacionadas con EPP presente y ausente. La documentación oficial indica licencia AGPL-3.0; se conservará la atribución y se respetarán sus condiciones de uso \cite{ultralytics_dataset}. La copia disponible contiene 1,413 imágenes por la expiración de tres URL del CDN. Se utilizarán los splits preparados en \texttt{dataset\_v2/}: 1,130 imágenes de entrenamiento, 143 de validación y 140 de prueba local.
+
+Para el Agente 1 se generarán datos sintéticos de nómina con semilla 42. Incluirán empresas, puestos, turnos, empleados pseudonimizados, asistencias, incidentes, períodos de nómina y reglas configurables. No se usarán nombres reales, rostros, cédulas ni salarios reales. La identificación se simulará mediante códigos badge/QR y casos controlados de credencial válida, inválida o duplicada.
+
+\section{Línea base y solución propuesta}
+La línea base principal será un LLM con prompt único y sin herramientas, evaluado en las mismas tareas de nómina. La solución será el Agente 1 con herramientas deterministas y estado de asistencia, conectado secuencialmente al Agente 2 YOLOv8s. Esta comparación permitirá medir si el uso de herramientas mejora la ejecución de tareas frente a una respuesta conversacional sin acceso a datos ni acciones externas. La visión EPP se comparará adicionalmente con el detector base sin confirmación temporal.
+
+\begin{table}[htbp]
+\centering
+\caption{Medidas y umbrales definidos antes de experimentar}
+\label{tab:metricas}
+\scriptsize
+\begin{tabularx}{\columnwidth}{P{0.29\columnwidth}Y P{0.19\columnwidth}}
+\toprule
+\textbf{Medida} & \textbf{Fórmula o procedimiento} & \textbf{Aceptación} \\
+\midrule
+Éxito de tarea del Agente 1 & Tareas de nómina completadas correctamente / tareas intentadas; mínimo 20 casos & $\geq 0.80$ \\
+Estado de asistencia & F1 para presente, tardanza, bloqueado y ausente & $\geq 0.85$ \\
+Errores de herramientas & Llamadas incorrectas o fallidas / llamadas totales & $\leq 0.05$ \\
+Error de horas & Error absoluto entre horas calculadas y valor esperado & $\leq 1$ min \\
+Recall de incidente EPP & Escenas con falta alertadas / escenas con falta & $\geq 0.70$ \\
+Reporte y respuesta & Reportes PDF correctos; tiempo por tarea completa & $\geq 0.95$; $<5$ s \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Cada medida se probará con escenarios normales, límites y fallas esperadas: badge inexistente, empleado duplicado, entrada sin salida, cambio de turno, frame inválido, falta de EPP y cierre de jornada con varias personas. Cuando exista aleatoriedad se realizarán al menos cinco repeticiones, con media y desviación estándar. Los logs registrarán percepción, herramienta invocada, decisión, acción y timestamp.
+
+\section{Resultado esperado}
+SAFESITE V2 debe producir un flujo reproducible de control de acceso, asistencia y cumplimiento de EPP, con separación clara entre el razonamiento con herramientas del Agente 1 y la percepción visual del Agente 2. La aprobación de esta propuesta depende de que el alcance, los datos, la línea base y los umbrales sean viables antes de iniciar las pruebas formales.
+
+\begin{thebibliography}{9}
+\bibitem{ultralytics_dataset}
+Ultralytics, ``Construction-PPE Dataset,'' documentación oficial, 2026. Disponible en: \url{https://docs.ultralytics.com/datasets/detect/construction-ppe}
+\end{thebibliography}
+
+\end{document}
