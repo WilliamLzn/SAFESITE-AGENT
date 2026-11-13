@@ -1,0 +1,4 @@
+{
+  "tolerancia_tardanza_min": 10,
+  "ventana_duplicado_min": 2
+}
