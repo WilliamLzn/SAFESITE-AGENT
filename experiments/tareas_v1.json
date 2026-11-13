@@ -1,0 +1,230 @@
+{
+  "semilla": 42,
+  "n_tareas": 25,
+  "tareas": [
+    {
+      "id": "T01",
+      "tipo": "estado_asistencia",
+      "pregunta": "¿Cuál fue el estado de asistencia del badge BDG-022 el 2026-11-06? Responde solo con una palabra: presente, tardanza, bloqueado o ausente.",
+      "respuesta_esperada": "presente",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-022",
+      "fecha": "2026-11-06"
+    },
+    {
+      "id": "T02",
+      "tipo": "estado_asistencia",
+      "pregunta": "¿Cuál fue el estado de asistencia del badge BDG-009 el 2026-11-05? Responde solo con una palabra: presente, tardanza, bloqueado o ausente.",
+      "respuesta_esperada": "tardanza",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-009",
+      "fecha": "2026-11-05"
+    },
+    {
+      "id": "T03",
+      "tipo": "estado_asistencia",
+      "pregunta": "¿Cuál fue el estado de asistencia del badge BDG-001 el 2026-11-04? Responde solo con una palabra: presente, tardanza, bloqueado o ausente.",
+      "respuesta_esperada": "ausente",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-001",
+      "fecha": "2026-11-04"
+    },
+    {
+      "id": "T04",
+      "tipo": "estado_asistencia",
+      "pregunta": "¿Cuál fue el estado de asistencia del badge BDG-008 el 2026-11-06? Responde solo con una palabra: presente, tardanza, bloqueado o ausente.",
+      "respuesta_esperada": "bloqueado",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-008",
+      "fecha": "2026-11-06"
+    },
+    {
+      "id": "T05",
+      "tipo": "horas_trabajadas",
+      "pregunta": "¿Cuántos minutos trabajó el badge BDG-008 el 2026-11-04? Responde solo con el número entero.",
+      "respuesta_esperada": 499,
+      "tipo_respuesta": "entero",
+      "tolerancia": 1,
+      "badge": "BDG-008",
+      "fecha": "2026-11-04"
+    },
+    {
+      "id": "T06",
+      "tipo": "horas_trabajadas",
+      "pregunta": "¿Cuántos minutos trabajó el badge BDG-007 el 2026-11-05? Responde solo con el número entero.",
+      "respuesta_esperada": 499,
+      "tipo_respuesta": "entero",
+      "tolerancia": 1,
+      "badge": "BDG-007",
+      "fecha": "2026-11-05"
+    },
+    {
+      "id": "T07",
+      "tipo": "horas_trabajadas",
+      "pregunta": "¿Cuántos minutos trabajó el badge BDG-005 el 2026-11-02? Responde solo con el número entero.",
+      "respuesta_esperada": 501,
+      "tipo_respuesta": "entero",
+      "tolerancia": 1,
+      "badge": "BDG-005",
+      "fecha": "2026-11-02"
+    },
+    {
+      "id": "T08",
+      "tipo": "badge_inexistente",
+      "pregunta": "El badge BDG-996 marcó entrada el 2026-11-02 a las 11:36:00. ¿Cuál es su estado en la nómina? Responde solo: badge_inexistente o empleado_valido.",
+      "respuesta_esperada": "badge_inexistente",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-996",
+      "fecha": "2026-11-02"
+    },
+    {
+      "id": "T09",
+      "tipo": "badge_inexistente",
+      "pregunta": "El badge BDG-943 marcó entrada el 2026-11-02 a las 14:00:00. ¿Cuál es su estado en la nómina? Responde solo: badge_inexistente o empleado_valido.",
+      "respuesta_esperada": "badge_inexistente",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-943",
+      "fecha": "2026-11-02"
+    },
+    {
+      "id": "T10",
+      "tipo": "badge_inexistente",
+      "pregunta": "El badge BDG-993 marcó entrada el 2026-11-04 a las 12:47:00. ¿Cuál es su estado en la nómina? Responde solo: badge_inexistente o empleado_valido.",
+      "respuesta_esperada": "badge_inexistente",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-993",
+      "fecha": "2026-11-04"
+    },
+    {
+      "id": "T11",
+      "tipo": "entrada_duplicada",
+      "pregunta": "El badge BDG-012 pasó el lector más de una vez como entrada el 2026-11-02. ¿Cuántas entradas válidas tiene ese día, descartando duplicados? Responde solo el número.",
+      "respuesta_esperada": 1,
+      "tipo_respuesta": "entero",
+      "badge": "BDG-012",
+      "fecha": "2026-11-02"
+    },
+    {
+      "id": "T12",
+      "tipo": "entrada_duplicada",
+      "pregunta": "El badge BDG-029 pasó el lector más de una vez como entrada el 2026-11-04. ¿Cuántas entradas válidas tiene ese día, descartando duplicados? Responde solo el número.",
+      "respuesta_esperada": 1,
+      "tipo_respuesta": "entero",
+      "badge": "BDG-029",
+      "fecha": "2026-11-04"
+    },
+    {
+      "id": "T13",
+      "tipo": "entrada_duplicada",
+      "pregunta": "El badge BDG-015 pasó el lector más de una vez como entrada el 2026-11-05. ¿Cuántas entradas válidas tiene ese día, descartando duplicados? Responde solo el número.",
+      "respuesta_esperada": 1,
+      "tipo_respuesta": "entero",
+      "badge": "BDG-015",
+      "fecha": "2026-11-05"
+    },
+    {
+      "id": "T14",
+      "tipo": "entrada_sin_salida",
+      "pregunta": "¿Cuántos minutos trabajó el badge BDG-019 el 2026-11-06? Si no se puede calcular con certeza, responde exactamente: incompleto. Si se puede, responde el número entero.",
+      "respuesta_esperada": "incompleto",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-019",
+      "fecha": "2026-11-06"
+    },
+    {
+      "id": "T15",
+      "tipo": "entrada_sin_salida",
+      "pregunta": "¿Cuántos minutos trabajó el badge BDG-002 el 2026-11-05? Si no se puede calcular con certeza, responde exactamente: incompleto. Si se puede, responde el número entero.",
+      "respuesta_esperada": "incompleto",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-002",
+      "fecha": "2026-11-05"
+    },
+    {
+      "id": "T16",
+      "tipo": "entrada_sin_salida",
+      "pregunta": "¿Cuántos minutos trabajó el badge BDG-026 el 2026-11-03? Si no se puede calcular con certeza, responde exactamente: incompleto. Si se puede, responde el número entero.",
+      "respuesta_esperada": "incompleto",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-026",
+      "fecha": "2026-11-03"
+    },
+    {
+      "id": "T17",
+      "tipo": "cambio_de_turno",
+      "pregunta": "El badge BDG-006 estaba en el turno TARDE, pero el 2026-11-02 fue reasignado al turno MANANA. Con sus marcaciones reales de ese día, ¿cuál es su estado? Responde solo: presente, tardanza, bloqueado o ausente.",
+      "respuesta_esperada": "tardanza",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-006",
+      "fecha": "2026-11-02"
+    },
+    {
+      "id": "T18",
+      "tipo": "cambio_de_turno",
+      "pregunta": "El badge BDG-011 estaba en el turno TARDE, pero el 2026-11-06 fue reasignado al turno MANANA. Con sus marcaciones reales de ese día, ¿cuál es su estado? Responde solo: presente, tardanza, bloqueado o ausente.",
+      "respuesta_esperada": "tardanza",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-011",
+      "fecha": "2026-11-06"
+    },
+    {
+      "id": "T19",
+      "tipo": "cambio_de_turno",
+      "pregunta": "El badge BDG-012 estaba en el turno TARDE, pero el 2026-11-02 fue reasignado al turno MANANA. Con sus marcaciones reales de ese día, ¿cuál es su estado? Responde solo: presente, tardanza, bloqueado o ausente.",
+      "respuesta_esperada": "tardanza",
+      "tipo_respuesta": "categoria",
+      "badge": "BDG-012",
+      "fecha": "2026-11-02"
+    },
+    {
+      "id": "T20",
+      "tipo": "cierre_jornada",
+      "pregunta": "Al cerrar el 2026-11-06, ¿cuántos minutos trabajaron en total todos los empleados con jornada completa (entrada y salida)? Responde solo el número entero.",
+      "respuesta_esperada": 12632,
+      "tipo_respuesta": "entero",
+      "tolerancia": 1,
+      "fecha": "2026-11-06"
+    },
+    {
+      "id": "T21",
+      "tipo": "cierre_jornada",
+      "pregunta": "Al cerrar el 2026-11-02, ¿cuántos minutos trabajaron en total todos los empleados con jornada completa (entrada y salida)? Responde solo el número entero.",
+      "respuesta_esperada": 12967,
+      "tipo_respuesta": "entero",
+      "tolerancia": 1,
+      "fecha": "2026-11-02"
+    },
+    {
+      "id": "T22",
+      "tipo": "cierre_jornada",
+      "pregunta": "Al cerrar el 2026-11-04, ¿cuántos minutos trabajaron en total todos los empleados con jornada completa (entrada y salida)? Responde solo el número entero.",
+      "respuesta_esperada": 13117,
+      "tipo_respuesta": "entero",
+      "tolerancia": 1,
+      "fecha": "2026-11-04"
+    },
+    {
+      "id": "T23",
+      "tipo": "reporte_agregado",
+      "pregunta": "¿Cuántos empleados llegaron con tardanza el 2026-11-03? Responde solo el número.",
+      "respuesta_esperada": 2,
+      "tipo_respuesta": "entero",
+      "fecha": "2026-11-03"
+    },
+    {
+      "id": "T24",
+      "tipo": "reporte_agregado",
+      "pregunta": "En toda la semana (2026-11-02 a 2026-11-06), ¿cuántas ausencias (empleado-día) hubo? Responde solo el número.",
+      "respuesta_esperada": 11,
+      "tipo_respuesta": "entero"
+    },
+    {
+      "id": "T25",
+      "tipo": "reporte_agregado",
+      "pregunta": "¿Cuántos empleados quedaron en estado presente el 2026-11-02? Responde solo el número.",
+      "respuesta_esperada": 21,
+      "tipo_respuesta": "entero",
+      "fecha": "2026-11-02"
+    }
+  ]
+}
