@@ -41,6 +41,7 @@ P_SIN_SALIDA = 0.04
 P_DUPLICADA = 0.04
 N_BADGES_BLOQUEADOS = 2
 N_INTENTOS_BADGE_INEXISTENTE = 3
+N_DUPLICADOS_FORZADOS = 4
 
 
 def _hhmm(texto):
@@ -105,6 +106,13 @@ def generar_marcaciones(rng, empleados):
         dia = PRIMER_DIA + timedelta(days=rng.randrange(N_DIAS))
         hora = _instante(dia, "06:00", rng.randint(0, 600))
         marcaciones.append((hora, f"BDG-9{rng.randint(10, 99)}", "entrada"))
+
+    # Garantiza un mínimo de duplicados: el azar solo puede dar muy pocos y
+    # el banco de tareas necesita varios casos reales de este tipo.
+    entradas_reales = [m for m in marcaciones
+                       if m[2] == "entrada" and m[1] in {e["badge"] for e in empleados}]
+    for ts, badge, _ in rng.sample(entradas_reales, N_DUPLICADOS_FORZADOS):
+        marcaciones.append((ts + timedelta(seconds=rng.randint(20, 60)), badge, "entrada"))
 
     marcaciones.sort(key=lambda x: x[0])
     return [
