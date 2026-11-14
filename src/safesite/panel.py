@@ -845,10 +845,26 @@ class PanelSafeSite:
 
     # ---------- endpoints de badges v2 ----------
     def badge_estado(self):
-        """Devuelve la lista de badges activos detectados (cada uno con su card).
-        Las cards se mantienen visibles hasta que el trabajador marque salida."""
+        """Devuelve TODOS los empleados de la nómina (30 cards siempre visibles).
+        Cada card muestra estado ADENTRO/AFUERA con su temporizador y EPP."""
+        # Obtener todos los empleados (como hace estado())
+        badges_lista = registro_asistencia.listar_todos()
+        # Marcar qué badges fueron detectados recientemente (para activar EPP)
+        badges_detectados_ids = set()
         with self.lock:
-            return [d["datos"] for d in self.badges_activos.values()]
+            for bid, d in self.badges_activos.items():
+                badges_detectados_ids.add(bid)
+        ahora_ts = time.time()
+        for b in badges_lista:
+            bid = b.get("badge_id", "")
+            if bid in badges_detectados_ids:
+                ultimo = self.badges_activos.get(bid, {}).get("ultima_deteccion", 0)
+                b["detectado_recientemente"] = (ahora_ts - ultimo) < 2.0
+                b["tiempo_deteccion"] = ultimo
+            else:
+                b["detectado_recientemente"] = False
+                b["tiempo_deteccion"] = 0
+        return badges_lista
 
     def badge_jornada_alertas(self):
         """Devuelve alertas de empleados que excedieron la jornada sin salir."""
@@ -906,7 +922,7 @@ def main():
                 if jpeg:
                     yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
                            + jpeg + b"\r\n")
-                time.sleep(1 / 15)
+                time.sleep(1 / 30)
         return Response(flujo(),
                         mimetype="multipart/x-mixed-replace; boundary=frame")
 
