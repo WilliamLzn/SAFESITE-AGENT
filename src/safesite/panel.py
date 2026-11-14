@@ -21,7 +21,7 @@ import collections
 import queue
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import cv2
 from flask import Flask, Response, jsonify
@@ -164,12 +164,15 @@ PAGINA = """<!DOCTYPE html>
             font-size:.75rem; padding:4px 10px; border-radius:6px; cursor:pointer; }
   .btn-forzar:hover { background:#b91c1c; }
 
-  /* ---------- botón exceso de jornada en esquina de cada badge ---------- */
-  .badge-exceso-wrapper { position:absolute; top:8px; right:8px; z-index:10; }
-  .btn-exceso { background:#b91c1c; border:none; color:#fff;
-            font-size:.65rem; padding:4px 8px; border-radius:6px;
-            cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.3); }
-  .btn-exceso:hover { background:#991b1b; }
+  /* ---------- estados Adentro/Afuera ---------- */
+  .estado-adentro { color:var(--verde); font-weight:700; }
+  .estado-afuera { color:var(--rojo); font-weight:700; }
+
+  /* ---------- temporizador ---------- */
+  .temporizador { margin-top:6px; padding:4px 8px; background:rgba(30,58,138,0.15);
+            border-radius:6px; border:1px solid rgba(30,58,138,0.3); }
+  .temporizador .label-temp { font-size:.7rem; color:var(--gris); margin-right:6px; }
+  .temporizador .valor-temp { font-size:.85rem; font-weight:700; color:var(--texto); font-family:monospace; }
   .badge-card .sub { color:var(--gris); font-size:.8rem; margin-bottom:8px; }
   .badge-card .chip { display:inline-block; padding:4px 10px; border-radius:20px;
                 font-size:.8rem; font-weight:700; margin:4px 2px; }
@@ -278,52 +281,61 @@ async function refrescarBadge() {
     none.style.display = 'none';
     contenedor.style.display = 'grid';
 
-    // Construir HTML de todas las cards
+    // Construir HTML de TODAS las cards (30 empleados siempre visibles)
     let html = '';
     const mapeoEPP = {casco:'epp-casco', gafas:'epp-gafas', guantes:'epp-guantes', botas:'epp-botas'};
+    const iconosEPP = {casco:'🪖', gafas:'👓', guantes:'🧤', botas:'🥾'};
 
     for (const b of badges) {
       const activo = b.activo === true;
       const chipClass = activo ? 'chip-activo' : 'chip-bloqueado';
       const chipText = activo ? 'ACTIVO' : 'BLOQUEADO';
-      const ts = b.timestamp ? new Date(b.timestamp).toLocaleTimeString('es-CO') : '—';
+      const dentro = b.dentro === true;
 
-      // Iconos EPP
-      const epp = b.epp || {};
+      // Estado Adentro/Afuera
+      const estadoClase = dentro ? 'estado-adentro' : 'estado-afuera';
+      const estadoTexto = dentro ? 'ADENTRO' : 'AFUERA';
+
+      // Temporizador: si está adentro, mostrar tiempo transcurrido
+      let temporizadorHtml = '';
+      if (dentro) {
+        temporizadorHtml = `
+          <div class="temporizador">
+            <span class="label-temp">Tiempo:</span>
+            <span class="valor-temp" id="temp-${b.badge_id}">0:00</span>
+          </div>`;
+      }
+
+      // Iconos EPP: gris inicialmente, rojo/verde solo si detectado_recientemente
+      const detectado = b.detectado_recientemente === true;
+      const epp = detectado ? (b.epp || {}) : {};
       let eppHtml = '';
       Object.entries(mapeoEPP).forEach(([clave]) => {
         const val = epp[clave];
-        const estadoCls = val === true ? 'tiene' : (val === false ? 'falta' : 'sin-detectar');
-        const iconos = {casco:'🪖', gafas:'👓', guantes:'🧤', botas:'🥾'};
+        // Si no detectado recientemente, todo gris
+        const estadoCls = detectado
+          ? (val === true ? 'tiene' : (val === false ? 'falta' : 'sin-detectar'))
+          : 'sin-detectar';
         eppHtml += `<div class="epp-icon ${estadoCls}" id="epp-${clave}-${b.badge_id}">
-          ${iconos[clave]||'❓'}<span class="nombre">${clave}</span>
+          ${iconosEPP[clave]||'❓'}<span class="nombre">${clave}</span>
         </div>`;
       });
 
-      // Resumen de horas/pago (solo si existe)
+      // Resumen de horas/pago
       let resumenHtml = '';
       if (b.existe !== false) {
         resumenHtml = `
           <div class="resumen-badge">
-            <div class="row"><span class="label">Horas hoy:</span><span class="valor" id="horas-${b.badge_id}">${b.horas_hoy||0}</span> h</div>
-            <div class="row"><span class="label">Valor a pagar:</span><span class="valor" id="valor-${b.badge_id}">$${(b.valor_pagar||0).toLocaleString('es-CO')}</span></div>
-            <div class="row"><span class="label">Estado:</span><span class="valor" id="estado-${b.badge_id}">${b.dentro ? 'DENTRO' : 'FUERA'}</span></div>
+            <div class="row"><span class="label">Horas:</span><span class="valor" id="horas-${b.badge_id}">${b.horas_hoy||0}</span> h</div>
+            <div class="row"><span class="label">Valor:</span><span class="valor" id="valor-${b.badge_id}">$${(b.valor_pagar||0).toLocaleString('es-CO')}</span></div>
+            <div class="row"><span class="label">Estado:</span><span class="valor estado-${dentro?'adentro':'afuera'}">${estadoTexto}</span></div>
+            ${temporizadorHtml}
           </div>`;
       }
-
-      // Botón simular exceso de jornada (estándar 8h)
-      const excesoHtml = `
-        <button class="btn-exceso" data-badge="${b.badge_id}"
-                title="Simular exceso de jornada (8h)">
-          ⚠️ Exceso 8h
-        </button>`;
 
       html += `
         <div class="badge-card-multiple">
           <div class="qr-placeholder">QR</div>
-          <div class="badge-exceso-wrapper">
-            ${excesoHtml}
-          </div>
           <h2>${b.nombre || '—'}</h2>
           <div class="sub">${b.puesto || '—'}</div>
           <span class="chip ${chipClass}">${chipText}</span>
@@ -331,7 +343,6 @@ async function refrescarBadge() {
           <div class="badge-meta">
             <div>Badge: ${b.badge_id || '—'}</div>
             <div>Turno: ${b.turno || '—'}</div>
-            <div>Lectura: ${ts}</div>
           </div>
           <div class="badge-actions">
             <button class="boton primario btn-entrada" data-badge="${b.badge_id}">✅ Entrada</button>
@@ -350,11 +361,8 @@ async function refrescarBadge() {
     document.querySelectorAll('.btn-salida').forEach(btn => {
       btn.onclick = (e) => marcarBadge(e.target.dataset.badge, 'salida');
     });
-    document.querySelectorAll('.btn-exceso').forEach(btn => {
-      btn.onclick = (e) => simularExcesoJornada(e.target.dataset.badge);
-    });
 
-    // Actualizar resúmenes de horas/pago para cada badge (fetch individual)
+    // Actualizar resúmenes y temporizadores para cada badge
     for (const b of badges) {
       if (b.badge_id) {
         try {
@@ -364,9 +372,17 @@ async function refrescarBadge() {
             const h = document.getElementById(`horas-${b.badge_id}`);
             const v = document.getElementById(`valor-${b.badge_id}`);
             const e = document.getElementById(`estado-${b.badge_id}`);
+            const t = document.getElementById(`temp-${b.badge_id}`);
             if (h) h.textContent = s.horas_hoy || 0;
             if (v) v.textContent = '$' + (s.valor_pagar || 0).toLocaleString('es-CO');
-            if (e) e.textContent = s.dentro ? 'DENTRO' : 'FUERA';
+            if (e) e.textContent = s.dentro ? 'ADENTRO' : 'AFUERA';
+            if (t && s.dentro && s.horas_dentro_ahora !== null) {
+              const totalSegundos = Math.floor(s.horas_dentro_ahora * 3600);
+              const h = Math.floor(totalSegundos / 3600);
+              const m = Math.floor((totalSegundos % 3600) / 60);
+              const s2 = totalSegundos % 60;
+              t.textContent = `${h}:${m.toString().padStart(2,'0')}:${s2.toString().padStart(2,'0')}`;
+            }
           }
         } catch (err) { /* resumen opcional */ }
       }
@@ -480,23 +496,6 @@ async function forzarSalida(badgeId) {
     if (e.ok) {
       alert(`Salida forzada registrada para ${e.nombre || badgeId}`);
       refrescar();
-    } else {
-      alert('Error: ' + (e.motivo || 'desconocido'));
-    }
-  } catch (err) {
-    alert('Error de red');
-  }
-}
-
-async function simularExcesoJornada(badgeId) {
-  if (!badgeId) return;
-  if (!confirm(`¿Simular que ${badgeId} excedió las 8 horas de jornada sin salir?`)) return;
-  try {
-    const r = await fetch('/badge/simular-exceso/' + encodeURIComponent(badgeId), {method:'POST'});
-    const e = await r.json();
-    if (e.ok) {
-      alert(`Simulado exceso de jornada para ${e.nombre || badgeId}`);
-      refrescarBadge();
     } else {
       alert('Error: ' + (e.motivo || 'desconocido'));
     }
@@ -806,9 +805,26 @@ class PanelSafeSite:
             conteos = dict(getattr(self, "_conteos", {}))
             faltas = [{"clase": d.nombre, "conf": round(d.conf, 2)}
                       for d in getattr(self, "_faltas", [])]
-            badges_lista = [d["datos"] for d in self.badges_activos.values()]
+            # Obtener TODOS los empleados de la nómina (30 cards siempre visibles)
+            badges_lista = registro_asistencia.listar_todos()
         # Alertas de jornada sin salida (fuera del lock para no bloquear)
         alertas_jornada = registro_asistencia.obtener_jornadas_sin_salida()
+        # Marcar qué badges fueron detectados recientemente (para activar EPP)
+        badges_detectados_ids = set()
+        with self.lock:
+            for bid, d in self.badges_activos.items():
+                badges_detectados_ids.add(bid)
+        ahora_ts = time.time()
+        for b in badges_lista:
+            bid = b.get("badge_id", "")
+            # Si fue detectado recientemente, marcar para activar EPP después de 1s
+            if bid in badges_detectados_ids:
+                ultimo = self.badges_activos.get(bid, {}).get("ultima_deteccion", 0)
+                b["detectado_recientemente"] = (ahora_ts - ultimo) < 2.0
+                b["tiempo_deteccion"] = ultimo
+            else:
+                b["detectado_recientemente"] = False
+                b["tiempo_deteccion"] = 0
         return {
             "zona": self.zona,
             "perfil": self.perfil,
@@ -841,30 +857,6 @@ class PanelSafeSite:
     def badge_salida_forzada(self, badge_id):
         """El administrador forza la salida de un empleado que excedió la jornada."""
         return registro_asistencia.cancelar_nomina_por_olvido_salida(badge_id)
-
-    def badge_simular_exceso(self, badge_id):
-        """Simula que un empleado excedió las 8 horas de jornada sin salir.
-        Solo con fines de prueba/demo."""
-        emp = registro_asistencia.empleado_por_badge(badge_id)
-        if emp is None:
-            return {"ok": False, "motivo": "badge_inexistente"}
-        # Forzar una entrada antigua para simular exceso de jornada
-        ahora = datetime.now()
-        desde_hace = ahora - timedelta(hours=9)  # 9 horas atrás
-        timestamp_falso = desde_hace.isoformat()
-        with registro_asistencia.lock:
-            # Registrar una entrada antigua para que parezca que lleva 9h dentro
-            registro_asistencia._estado_actual[badge_id] = {
-                "dentro": True,
-                "ultima_entrada": timestamp_falso,
-            }
-            registro_asistencia._persistir_marcacion(badge_id, "entrada", timestamp_falso)
-        return {
-            "ok": True,
-            "badge": badge_id,
-            "nombre": emp.get("nombre", ""),
-            "motivo": "simulado_exceso_jornada_8h",
-        }
 
     def badge_marcar(self, badge_id, accion):
         """Marca entrada o salida de un badge (acción explícita desde el panel)."""
@@ -960,10 +952,6 @@ def main():
     @app.route("/badge/salida-forzada/<badge_id>", methods=["POST"])
     def badge_salida_forzada(badge_id):
         return jsonify(panel.badge_salida_forzada(badge_id))
-
-    @app.route("/badge/simular-exceso/<badge_id>", methods=["POST"])
-    def badge_simular_exceso(badge_id):
-        return jsonify(panel.badge_simular_exceso(badge_id))
 
     panel.iniciar()
     modo_wa = (panel.whatsapp_real.modo if panel.whatsapp_real
