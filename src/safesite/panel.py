@@ -53,7 +53,8 @@ PAGINA = """<!DOCTYPE html>
   /* ---------- contenedor scrollable de badges (independiente del resto) ---------- */
   #badge-contenedor { height: 420px; overflow-y: auto; border: 1px solid var(--gris);
              border-radius: 10px; background: rgba(30,41,59,0.6);
-             display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 10px; }
+             display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px;
+             width: 100%; }
   #badge-contenedor::-webkit-scrollbar { width: 8px; }
   #badge-contenedor::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
   #badge-contenedor::-webkit-scrollbar-thumb { background: var(--gris); border-radius: 4px; }
@@ -63,7 +64,7 @@ PAGINA = """<!DOCTYPE html>
   .badge-card-compacta { background: var(--tarjeta); border-radius: 8px; padding: 10px;
              margin: 0; border: 1px solid rgba(255,255,255,0.1);
              display: flex; flex-direction: column; align-items: center; gap: 6px;
-             height: 150px; justify-content: flex-start; }
+             height: 150px; justify-content: flex-start; width: 100%; }
   .badge-card-compacta .qr-placeholder { width: 70px; height: 70px; background: #000;
              border-radius: 6px; margin: 4px auto 2px; display: flex;
              align-items: center; justify-content: center; color: #666;
@@ -317,19 +318,22 @@ async function refrescarBadge() {
   try {
     const r = await fetch('/badge/estado');
     const badges = await r.json();
-    const contenedor = document.getElementById('badge-cards');
+    const contenedor = document.getElementById('badge-contenedor');
+    const cardsGrid = document.getElementById('badge-cards');
     const none = document.getElementById('badge-none');
     const tarjetasEPP = document.getElementById('tarjetas-epp');
 
     if (!badges || badges.length === 0) {
-      contenedor.style.display = 'none';
+      cardsGrid.style.display = 'none';
       none.style.display = 'block';
       tarjetasEPP.style.display = 'none';
+      contenedor.style.display = 'block';
       return;
     }
 
     none.style.display = 'none';
-    contenedor.style.display = 'grid';
+    cardsGrid.style.display = 'grid';
+    contenedor.style.display = 'block';
 
     // Construir HTML de TODAS las cards (30 empleados siempre visibles)
     let html = '';
@@ -400,7 +404,7 @@ async function refrescarBadge() {
         </div>`;
     }
 
-    contenedor.innerHTML = html;
+    cardsGrid.innerHTML = html;
 
     // Vincular eventos de botones dinámicos
     document.querySelectorAll('.btn-entrada').forEach(btn => {
