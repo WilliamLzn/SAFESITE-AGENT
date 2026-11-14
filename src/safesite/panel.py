@@ -412,7 +412,7 @@ class PanelSafeSite:
                             "puesto": lectura.badge.puesto,
                             "turno": lectura.badge.turno,
                             "estado_badge": lectura.badge.estado_badge,
-                            "timestamp": lectura.timestamp,
+                            "timestamp": lectura.badge.timestamp,
                             "activo": lectura.badge.estado_badge == "activo",
                             "epp": epp,
                         }
@@ -548,7 +548,7 @@ class PanelSafeSite:
         return {
             "zona": self.zona,
             "perfil": self.perfil,
-            "modelo": config.RUTA_MODELO.split("\\")[-3],
+            "modelo": config.RUTA_MODELO.split("/")[-3] if "/" in config.RUTA_MODELO else config.RUTA_MODELO,
             "fps": self.fps,
             "latencia_ms": round(self.agente.latencia_media_ms, 1),
             "detecciones": conteos,
