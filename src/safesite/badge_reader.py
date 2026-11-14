@@ -3,6 +3,9 @@
 Detecta y decodifica QR codes en el stream de la cámara usando
 cv2.QRCodeDetector de OpenCV (sin dependencias externas del sistema).
 
+La detección QR se ejecuta en un HILO SEPARADO con una cola de frames,
+para no bloquear el loop principal de captura de video y lograr >=30 FPS.
+
 Mejoras de precisión:
 - Preprocesamiento: escala de gris, CLAHE (contraste adaptativo),
   umbral adaptativo y desenfoque gaussiano para reducir ruido.
@@ -22,8 +25,10 @@ Se integra con src/nomina/reglas.py para validar el badge contra la nómina
 y registrar entrada/salida.
 """
 
+import threading
 import time
-from dataclasses import dataclass, field
+from collections import deque
+from dataclasses import dataclass
 from typing import Optional, List, Tuple
 
 import cv2
@@ -55,73 +60,204 @@ class LecturaBadge:
 
 class LectorBadgeQR:
     """Lee QRs de badges desde fotogramas de la cámara con múltiples
-    estrategias de preprocesamiento para mejorar la detección."""
+    estrategias de preprocesamiento, ejecutado en un hilo separado
+    para no bloquear el loop principal de video."""
 
     def __init__(self, cooldown_segundos=2.0, cooldown_fallido=0.5,
-                 detectar_cada_n_frames=3):
+                 detectar_cada_n_frames=10, cola_max_tamaño=5):
         """
         cooldown_segundos: tiempo mínimo entre lecturas exitosas del mismo
                            badge (evita re-leer constantemente).
         cooldown_fallido: tiempo mínimo entre intentos de lectura fallida
                           del mismo badge (evita saturar la CPU).
         detectar_cada_n_frames: ejecutar detección QR cada N frames (ahorra CPU).
+        cola_max_tamaño: máximo de frames en la cola del hilo de detección.
         """
         self.detector = cv2.QRCodeDetector()
         self.cooldown_segundos = cooldown_segundos
         self.cooldown_fallido = cooldown_fallido
         self.detectar_cada_n_frames = detectar_cada_n_frames
-        self._contador_frames = 0
+        self.cola_max_tamaño = cola_max_tamaño
+
+        # Cola y hilo de detección
+        self._cola_frames = deque(maxlen=cola_max_tamaño)
+        self._cola_lock = threading.Lock()
+        self._detener = False
+        self._hilo_deteccion = None
+        self._iniciado = False
+
+        # Estado de lecturas (acceso thread-safe)
+        self._lecturas_lock = threading.Lock()
         self._ultima_lectura_por_badge = {}   # badge_id -> timestamp
         self._ultimo_intento_por_badge = {}   # badge_id -> timestamp (fallido)
         self._ultimo_badge_id = None          # último badge leído (cualquiera)
-        self._historial = []                  # lista de LecturaBadge
+        self._ultimas_lecturas = []           # lista de LecturaBadge (últimas N)
+        self._contador_frames = 0
+
+    # ------------------------------------------------------------------ inicio/parada
+
+    def iniciar(self):
+        """Inicia el hilo de detección QR en segundo plano."""
+        if self._iniciado:
+            return
+        self._detener = False
+        self._hilo_deteccion = threading.Thread(
+            target=self._bucle_deteccion, daemon=True)
+        self._hilo_deteccion.start()
+        self._iniciado = True
+        print("🔍 Lector QR iniciado en hilo separado", flush=True)
+
+    def detener(self):
+        """Detiene el hilo de detección QR."""
+        self._detener = True
+        if self._hilo_deteccion is not None:
+            self._hilo_deteccion.join(timeout=2.0)
+        self._iniciado = False
+
+    def encolar_frame(self, frame: np.ndarray):
+        """Agrega un frame a la cola para detección (llamar desde el hilo principal)."""
+        if not self._iniciado:
+            return
+        with self._cola_lock:
+            self._cola_frames.append(frame.copy())
+
+    def obtener_lecturas(self) -> List[LecturaBadge]:
+        """Devuelve las lecturas nuevas acumuladas y las limpia."""
+        with self._lecturas_lock:
+            lecturas = list(self._ultimas_lecturas)
+            self._ultimas_lecturas = []
+            return lecturas
+
+    # ------------------------------------------------------------------ bucle de detección (hilo separado)
+
+    def _bucle_deteccion(self):
+        """Bucle principal del hilo: procesa frames de la cola y detecta QRs."""
+        contador_local = 0
+        while not self._detener:
+            # Obtener un frame de la cola
+            frame = None
+            with self._cola_lock:
+                if self._cola_frames:
+                    frame = self._cola_frames.popleft()
+
+            if frame is None:
+                time.sleep(0.005)  # evitar busy-wait
+                continue
+
+            contador_local += 1
+            if contador_local % self.detectar_cada_n_frames != 0:
+                continue
+
+            ahora = time.time()
+
+            # Generar versiones preprocesadas del frame
+            versiones = self._preprocesar(frame)
+
+            lecturas_encontradas = False
+            for versión in versiones:
+                data, puntos = self._intentar_decodificar(versión)
+                if not data:
+                    continue
+
+                datos_lista = data if isinstance(data, list) else [data]
+                puntos_lista = puntos if puntos is not None else []
+
+                for i, contenido in enumerate(datos_lista):
+                    if not contenido:
+                        continue
+                    badge = self._parsear_qr(contenido, ahora)
+                    if not badge.valido:
+                        continue
+
+                    caja = self._extraer_caja(
+                        puntos_lista, i, frame.shape) \
+                        if puntos_lista is not None and len(puntos_lista) > i \
+                        else [0, 0, frame.shape[1], frame.shape[0]]
+
+                    # --- lógica de cooldown ---
+                    ultima_ok = self._ultima_lectura_por_badge.get(
+                        badge.badge_id, 0)
+                    hace_ok = ahora - ultima_ok
+
+                    ultima_fail = self._ultimo_intento_por_badge.get(
+                        badge.badge_id, 0)
+                    hace_fail = ahora - ultima_fail
+
+                    es_nuevo = badge.badge_id != self._ultimo_badge_id
+
+                    if hace_ok < self.cooldown_segundos and not es_nuevo:
+                        continue
+                    if hace_fail < self.cooldown_fallido and not es_nuevo:
+                        continue
+
+                    self._ultimo_intento_por_badge[badge.badge_id] = ahora
+                    self._ultima_lectura_por_badge[badge.badge_id] = ahora
+                    self._ultimo_badge_id = badge.badge_id
+
+                    lectura = LecturaBadge(
+                        badge=badge,
+                        caja=caja,
+                        conf=1.0,
+                        es_nuevo=es_nuevo,
+                    )
+
+                    with self._lecturas_lock:
+                        self._ultimas_lecturas.append(lectura)
+                        # Mantener solo las últimas 50 lecturas
+                        if len(self._ultimas_lecturas) > 50:
+                            self._ultimas_lecturas = self._ultimas_lecturas[-50:]
+
+                    lecturas_encontradas = True
+
+                if lecturas_encontradas:
+                    break
 
     # ------------------------------------------------------------------ preprocesamiento
 
     @staticmethod
     def _preprocesar(frame: np.ndarray) -> List[np.ndarray]:
-        """Genera varias versiones del frame para intentar detectar el QR.
-
-        Devuelve una lista de imágenes (gris, CLAHE, umbral, rotaciones).
-        """
+        """Genera varias versiones del frame para intentar detectar el QR."""
         versiones: List[np.ndarray] = []
 
-        # 1) Escala de gris
         gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # 2) CLAHE para mejorar contraste local (ayuda con iluminación desigual)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         gris_clahe = clahe.apply(gris)
 
-        # 3) Umbral adaptativo (binarización para QRs de bajo contraste)
         _, umbral = cv2.threshold(
             gris_clahe, 0, 255,
             cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # 4) Desenfoque ligero para reducir ruido
         suave = cv2.GaussianBlur(gris_clahe, (3, 3), 0)
 
         versiones.extend([gris, gris_clahe, umbral, suave])
 
-        # 5) Rotaciones para detectar QRs girados
-        for angulo in (90, 180, 270):
-            h, w = gris.shape
-            centro = (w / 2, h / 2)
+        # Rotaciones para detectar QRs girados (solo 0 y 180 para ahorrar CPU)
+        h, w = gris.shape
+        centro = (w / 2, h / 2)
+        for angulo in (180,):
             M = cv2.getRotationMatrix2D(centro, angulo, 1.0)
             rotada = cv2.warpAffine(gris, M, (w, h))
             versiones.append(rotada)
 
-        # 6) Versiones escaladas (reducido y aumentado) para QRs pequeños/lejanos
-        for escala in (0.7, 1.3):
-            if escala != 1.0:
-                nueva_w = int(frame.shape[1] * escala)
-                nueva_h = int(frame.shape[0] * escala)
-                escalado = cv2.resize(
-                    gris, (nueva_w, nueva_h),
-                    interpolation=cv2.INTER_LINEAR)
-                versiones.append(escalado)
+        # Versión reducida para QRs lejanos (ahorra CPU)
+        reducido = cv2.resize(
+            gris, (max(1, w // 2), max(1, h // 2)),
+            interpolation=cv2.INTER_LINEAR)
+        versiones.append(reducido)
 
         return versiones
+
+    @staticmethod
+    def _intentar_decodificar(imagen: np.ndarray) -> Tuple[Optional[str], Optional[np.ndarray]]:
+        """Intenta decodificar un QR en una imagen dada."""
+        try:
+            data, puntos, _ = cv2.QRCodeDetector().detectAndDecode(imagen)
+            if data:
+                return data, puntos
+        except Exception:
+            pass
+        return None, None
 
     @staticmethod
     def _extraer_caja(puntos_lista, idx, shape):
@@ -167,109 +303,18 @@ class LectorBadgeQR:
             valido=True,
         )
 
-    # ------------------------------------------------------------------ detección
-
-    def _intentar_decodificar(self, imagen: np.ndarray) -> Tuple[Optional[str], Optional[np.ndarray]]:
-        """Intenta decodificar un QR en una imagen dada.
-
-        Devuelve (datos, puntos) o (None, None).
-        """
-        try:
-            data, puntos, _ = self.detector.detectAndDecode(imagen)
-            if data:
-                return data, puntos
-        except Exception:
-            pass
-        return None, None
-
-    def detectar(self, frame):
-        """Detecta y decodifica QRs en un frame usando múltiples estrategias.
-
-        Solo ejecuta la detección completa cada `detectar_cada_n_frames` frames
-        para ahorrar CPU y mejorar los FPS de la cámara.
-
-        Devuelve lista[LecturaBadge] (puede estar vacía).
-        """
-        self._contador_frames += 1
-        if self._contador_frames % self.detectar_cada_n_frames != 0:
-            return []  # saltar este frame para no saturar la CPU
-
-        ahora = time.time()
-        lecturas: List[LecturaBadge] = []
-
-        # Generar versiones preprocesadas del frame (versiones reducidas para velocidad)
-        versiones = self._preprocesar(frame)
-
-        for versión in versiones:
-            data, puntos = self._intentar_decodificar(versión)
-            if not data:
-                continue
-
-            # detectAndDecode puede devolver string o lista
-            datos_lista = data if isinstance(data, list) else [data]
-            puntos_lista = puntos if puntos is not None else []
-
-            for i, contenido in enumerate(datos_lista):
-                if not contenido:
-                    continue
-                badge = self._parsear_qr(contenido, ahora)
-                if not badge.valido:
-                    continue
-
-                caja = self._extraer_caja(
-                    puntos_lista, i, frame.shape) \
-                    if puntos_lista is not None and len(puntos_lista) > i \
-                    else [0, 0, frame.shape[1], frame.shape[0]]
-
-                # --- lógica de cooldown ---
-                ultima_ok = self._ultima_lectura_por_badge.get(
-                    badge.badge_id, 0)
-                hace_ok = ahora - ultima_ok
-
-                ultima_fail = self._ultimo_intento_por_badge.get(
-                    badge.badge_id, 0)
-                hace_fail = ahora - ultima_fail
-
-                es_nuevo = badge.badge_id != self._ultimo_badge_id
-
-                # Si es el mismo badge y ya se leyó recientemente, saltar
-                if hace_ok < self.cooldown_segundos and not es_nuevo:
-                    continue
-
-                # Si hubo un intento fallido muy reciente, no saturar
-                if hace_fail < self.cooldown_fallido and not es_nuevo:
-                    continue
-
-                # Registrar intento (exitoso o no)
-                self._ultimo_intento_por_badge[badge.badge_id] = ahora
-
-                # Lectura exitosa: actualizar cooldown de éxito
-                self._ultima_lectura_por_badge[badge.badge_id] = ahora
-                self._ultimo_badge_id = badge.badge_id
-
-                lectura = LecturaBadge(
-                    badge=badge,
-                    caja=caja,
-                    conf=1.0,
-                    es_nuevo=es_nuevo,
-                )
-                lecturas.append(lectura)
-                self._historial.append(lectura)
-
-            # Si ya encontramos lecturas en esta versión, no necesitamos probar más
-            if lecturas:
-                break
-
-        return lecturas
-
     def historial_reciente(self, segundos=10):
         """Lecturas de los últimos `segundos` segundos."""
         ahora = time.time()
-        return [l for l in self._historial if ahora - l.timestamp <= segundos]
+        with self._lecturas_lock:
+            return [l for l in self._ultimas_lecturas if ahora - l.timestamp <= segundos]
 
     def reset(self):
         """Limpia el estado de cooldown y historial."""
-        self._ultima_lectura_por_badge.clear()
-        self._ultimo_intento_por_badge.clear()
-        self._ultimo_badge_id = None
-        self._historial.clear()
+        with self._lecturas_lock:
+            self._ultima_lectura_por_badge.clear()
+            self._ultimo_intento_por_badge.clear()
+            self._ultimo_badge_id = None
+            self._ultimas_lecturas.clear()
+        with self._cola_lock:
+            self._cola_frames.clear()

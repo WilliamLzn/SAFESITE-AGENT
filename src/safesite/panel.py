@@ -569,9 +569,10 @@ class PanelSafeSite:
         self.marca_fps = time.time()
         self.fps = 0.0
         self.incidentes = collections.deque(maxlen=50)
-        # ---------- lector de badges QR ----------
+        # ---------- lector de badges QR (hilo separado para >=30 FPS) ----------
         self.lector_qr = LectorBadgeQR(cooldown_segundos=2.0,
-                                       detectar_cada_n_frames=3)
+                                       detectar_cada_n_frames=10)
+        self.lector_qr.iniciar()  # hilo separado: no bloquea el video
         self.ultima_lectura = None   # LecturaBadge más reciente
         self.badges_activos = {}     # badge_id -> {"datos": dict, "ultima_deteccion": float}
         # Las cards de badge se mantienen visibles hasta que el trabajador
@@ -582,17 +583,18 @@ class PanelSafeSite:
         cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         if not cam.isOpened():
             raise RuntimeError("no se pudo abrir la webcam (¿la usa otra app?)")
-        cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         print(f"🎥 webcam abierta ({int(cam.get(3))}x{int(cam.get(4))})", flush=True)
         while True:
             ok, frame = cam.read()
             if not ok:
-                time.sleep(0.05)
+                time.sleep(0.01)
                 continue
 
-            # ---------- lectura de badge QR (siempre) ----------
-            lecturas = self.lector_qr.detectar(frame)
+            # ---------- lectura de badge QR (hilo separado, no bloquea) ----------
+            self.lector_qr.encolar_frame(frame)
+            lecturas = self.lector_qr.obtener_lecturas()
 
             # Solo procesar EPP (YOLO) si hay un badge ACTIVO detectado
             hay_badge_activo = False
