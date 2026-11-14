@@ -97,6 +97,17 @@ PAGINA = """<!DOCTYPE html>
   .resumen-badge .row { display:flex; justify-content:space-between; margin-bottom:4px; }
   .resumen-badge .label { color:var(--gris); }
   .resumen-badge .valor { font-weight:700; }
+
+  /* ---------- iconos EPP en tarjeta de badge (H4) ---------- */
+  .epp-iconos { display:flex; gap:10px; justify-content:center; margin:12px 0 6px; flex-wrap:wrap; }
+  .epp-icon { width:52px; height:52px; border-radius:12px; display:flex;
+              flex-direction:column; align-items:center; justify-content:center;
+              font-size:1.1rem; border:3px solid; }
+  .epp-icon.tiene { border-color:var(--verde); background:#ecfdf5; }
+  .epp-icon.falta { border-color:var(--rojo); background:#fef2f2; }
+  .epp-icon.sin-detectar { border-color:var(--gris); background:#f1f5f9; color:var(--gris); }
+  .epp-icon .nombre { font-size:.65rem; margin-top:4px; font-weight:700;
+              text-transform:uppercase; letter-spacing:.05em; }
 </style></head><body>
 <h1>👷 SafeSite-Agent — Supervisión en vivo</h1>
 <div class="sub" id="sub">conectando con la cámara…</div>
@@ -116,6 +127,20 @@ PAGINA = """<!DOCTYPE html>
     <h2 id="badge-nombre">—</h2>
     <div class="sub" id="badge-puesto">—</div>
     <span class="chip chip-activo" id="badge-chip">ACTIVO</span>
+    <div class="epp-iconos" id="badge-epp">
+      <div class="epp-icon sin-detectar" id="epp-casco">
+        🪖<span class="nombre">casco</span>
+      </div>
+      <div class="epp-icon sin-detectar" id="epp-gafas">
+        👓<span class="nombre">gafas</span>
+      </div>
+      <div class="epp-icon sin-detectar" id="epp-guantes">
+        🧤<span class="nombre">guantes</span>
+      </div>
+      <div class="epp-icon sin-detectar" id="epp-botas">
+        🥾<span class="nombre">botas</span>
+      </div>
+    </div>
     <div style="margin-top:8px; font-size:.85rem; color:var(--gris);">
       <div>Badge: <span id="badge-id">—</span></div>
       <div>Turno: <span id="badge-turno">—</span></div>
@@ -202,6 +227,15 @@ async function refrescarBadge() {
     chip.className = 'chip ' + (b.activo ? 'chip-activo' : 'chip-bloqueado');
     const ts = b.timestamp ? new Date(b.timestamp).toLocaleTimeString('es-CO') : '—';
     document.getElementById('badge-hora').textContent = ts;
+
+    // ---------- iconos EPP (H4) ----------
+    const epp = b.epp || {};
+    const mapeo = {casco:'epp-casco', gafas:'epp-gafas', guantes:'epp-guantes', botas:'epp-botas'};
+    Object.entries(mapeo).forEach(([clave, id]) => {
+      const el = document.getElementById(id);
+      const val = epp[clave];
+      el.className = 'epp-icon ' + (val === true ? 'tiene' : (val === false ? 'falta' : 'sin-detectar'));
+    });
 
     // resumen de horas/pago
     try {
@@ -369,6 +403,8 @@ class PanelSafeSite:
                     lectura = lecturas[0]
                     self.ultima_lectura = lectura
                     if lectura.badge and lectura.badge.valido:
+                        # ---------- estado EPP del mismo frame (H4) ----------
+                        epp = self._estado_epp(filtradas)
                         self.badge_actual = {
                             "badge_id": lectura.badge.badge_id,
                             "id_empleado": lectura.badge.id_empleado,
@@ -378,6 +414,7 @@ class PanelSafeSite:
                             "estado_badge": lectura.badge.estado_badge,
                             "timestamp": lectura.timestamp,
                             "activo": lectura.badge.estado_badge == "activo",
+                            "epp": epp,
                         }
             self.frames += 1
             ahora = time.time()
@@ -399,6 +436,24 @@ class PanelSafeSite:
         for d in filtradas:
             conteos[d.nombre] = conteos.get(d.nombre, 0) + 1
         return conteos
+
+    # ---------- estado EPP asociado al badge (H4) ----------
+    @staticmethod
+    def _estado_epp(filtradas):
+        """Determina si la persona tiene o le falta cada EPP.
+
+        Devuelve dict: {casco, gafas, guantes, botas} con valores
+        True (tiene), False (falta) o None (no detectado en el frame).
+        Prioridad: si hay detección positiva y negativa para la misma parte,
+        se gana la positiva (coherencia).
+        """
+        nombres = {d.nombre for d in filtradas}
+        return {
+            "casco": True if "helmet" in nombres else (False if "no_helmet" in nombres else None),
+            "gafas": True if "goggles" in nombres else (False if "no_goggle" in nombres else None),
+            "guantes": True if "gloves" in nombres else (False if "no_gloves" in nombres else None),
+            "botas": True if "boots" in nombres else (False if "no_boots" in nombres else None),
+        }
 
     # ---------- worker de WhatsApp ----------
     def _enviar_whatsapp(self):
