@@ -632,6 +632,8 @@ class PanelSafeSite:
                     cv2.putText(anotado, etiqueta, (x1, max(y1 - 10, 20)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
+            ahora_ts = time.time()
+
             with self.lock:
                 self.ultimo_frame = anotado
 
