@@ -31,6 +31,8 @@ from .actuarios import ActuadorConsola, ActuadorWhatsApp
 from .agente import SafeSiteAgent
 from .percepcion import Percepcion
 from .razonamiento import Incidente
+from .badge_reader import LectorBadgeQR
+from .asistencia import registro_asistencia
 
 PAGINA = """<!DOCTYPE html>
 <html lang="es"><head>
@@ -73,6 +75,28 @@ PAGINA = """<!DOCTYPE html>
   .boton:disabled { opacity:.5; cursor:wait; }
   .boton.apagado { border-color:var(--rojo); color:var(--rojo); }
   .faltas-badge { font-size:.75rem; color:var(--rojo); align-self:center; }
+
+  /* ---------- tarjeta de badge v2 ---------- */
+  .badge-card { background:var(--tarjeta); border-radius:14px; padding:18px;
+                margin:14px 0; text-align:center; border:2px solid var(--gris); }
+  .badge-card .qr-placeholder { width:140px; height:140px; background:#000;
+                border-radius:10px; margin:0 auto 12px; display:flex;
+                align-items:center; justify-content:center; color:#666;
+                font-size:.7rem; border:3px solid var(--primario-color); }
+  .badge-card h2 { margin:0 0 6px; font-size:1.5rem; }
+  .badge-card .sub { color:var(--gris); font-size:.9rem; margin-bottom:10px; }
+  .badge-card .chip { display:inline-block; padding:4px 10px; border-radius:20px;
+                font-size:.8rem; font-weight:700; margin:4px 2px; }
+  .chip-activo { background:var(--verde); color:#fff; }
+  .chip-bloqueado { background:var(--rojo); color:#fff; }
+  .badge-actions { margin-top:14px; display:flex; gap:10px; justify-content:center;
+                flex-wrap:wrap; }
+  .badge-none { color:var(--gris); font-style:italic; text-align:center; padding:20px; }
+  .resumen-badge { background:var(--tarjeta); border-radius:10px; padding:12px;
+                margin-top:10px; text-align:left; font-size:.85rem; }
+  .resumen-badge .row { display:flex; justify-content:space-between; margin-bottom:4px; }
+  .resumen-badge .label { color:var(--gris); }
+  .resumen-badge .valor { font-weight:700; }
 </style></head><body>
 <h1>👷 SafeSite-Agent — Supervisión en vivo</h1>
 <div class="sub" id="sub">conectando con la cámara…</div>
@@ -81,6 +105,34 @@ PAGINA = """<!DOCTYPE html>
   <button id="btn-alerta" class="boton" onclick="alertaManual()">📨 Enviar alerta ahora</button>
   <span class="faltas-badge" id="faltas-badge"></span>
 </div>
+
+<!-- ---------- tarjeta de badge detectado v2 ---------- -->
+<div class="badge-card" id="badge-card">
+  <div class="badge-none" id="badge-none">
+    ⏳ Esperando badge QR frente a la cámara…
+  </div>
+  <div id="badge-contenido" style="display:none;">
+    <div class="qr-placeholder" id="badge-qr">QR</div>
+    <h2 id="badge-nombre">—</h2>
+    <div class="sub" id="badge-puesto">—</div>
+    <span class="chip chip-activo" id="badge-chip">ACTIVO</span>
+    <div style="margin-top:8px; font-size:.85rem; color:var(--gris);">
+      <div>Badge: <span id="badge-id">—</span></div>
+      <div>Turno: <span id="badge-turno">—</span></div>
+      <div>Última lectura: <span id="badge-hora">—</span></div>
+    </div>
+    <div class="badge-actions">
+      <button class="boton primario" onclick="marcarBadge('entrada')">✅ Entrada</button>
+      <button class="boton" onclick="marcarBadge('salida')">🚪 Salida</button>
+    </div>
+    <div class="resumen-badge" id="badge-resumen" style="display:none;">
+      <div class="row"><span class="label">Horas hoy:</span><span class="valor" id="badge-horas">0</span> h</div>
+      <div class="row"><span class="label">Valor a pagar:</span><span class="valor" id="badge-valor">$0</span></div>
+      <div class="row"><span class="label">Estado:</span><span class="valor" id="badge-estado">—</span></div>
+    </div>
+  </div>
+</div>
+
 <div class="layout">
   <div>
     <img class="video" src="/video" alt="video en vivo">
@@ -125,6 +177,71 @@ async function alertaManual() {
   }, 2500);
 }
 
+async function refrescarBadge() {
+  try {
+    const r = await fetch('/badge/estado');
+    const b = await r.json();
+    const card = document.getElementById('badge-card');
+    const none = document.getElementById('badge-none');
+    const contenido = document.getElementById('badge-contenido');
+    if (!b || !b.badge_id) {
+      card.style.display = 'block';
+      none.style.display = 'block';
+      contenido.style.display = 'none';
+      return;
+    }
+    card.style.display = 'block';
+    none.style.display = 'none';
+    contenido.style.display = 'block';
+    document.getElementById('badge-nombre').textContent = b.nombre || '—';
+    document.getElementById('badge-puesto').textContent = b.puesto || '—';
+    document.getElementById('badge-id').textContent = b.badge_id || '—';
+    document.getElementById('badge-turno').textContent = b.turno || '—';
+    const chip = document.getElementById('badge-chip');
+    chip.textContent = b.activo ? 'ACTIVO' : 'BLOQUEADO';
+    chip.className = 'chip ' + (b.activo ? 'chip-activo' : 'chip-bloqueado');
+    const ts = b.timestamp ? new Date(b.timestamp).toLocaleTimeString('es-CO') : '—';
+    document.getElementById('badge-hora').textContent = ts;
+
+    // resumen de horas/pago
+    try {
+      const r2 = await fetch('/badge/resumen/' + encodeURIComponent(b.badge_id));
+      const s = await r2.json();
+      if (s.existe) {
+        document.getElementById('badge-horas').textContent = s.horas_hoy || 0;
+        document.getElementById('badge-valor').textContent = '$' + (s.valor_pagar || 0).toLocaleString('es-CO');
+        document.getElementById('badge-estado').textContent = s.dentro ? 'DENTRO' : 'FUERA';
+        document.getElementById('badge-resumen').style.display = 'block';
+      } else {
+        document.getElementById('badge-resumen').style.display = 'none';
+      }
+    } catch (err) { /* resumen opcional */ }
+  } catch (err) { /* reintenta en el proximo tick */ }
+}
+
+async function marcarBadge(accion) {
+  const b = document.getElementById('badge-id');
+  const badgeId = b.textContent;
+  if (!badgeId || badgeId === '—') return;
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '⏳…';
+  try {
+    const r = await fetch('/badge/marcar/' + encodeURIComponent(badgeId) + '/' + accion, {method:'POST'});
+    const e = await r.json();
+    if (e.ok) {
+      btn.textContent = accion === 'entrada' ? '✅ Entrada' : '🚪 Salida';
+      setTimeout(() => { btn.disabled = false; }, 1500);
+      refrescarBadge(); // actualizar estado
+    } else {
+      btn.textContent = '⚠️ ' + (e.motivo || 'error');
+      setTimeout(() => { btn.disabled = false; btn.textContent = accion === 'entrada' ? '✅ Entrada' : '🚪 Salida'; }, 2000);
+    }
+  } catch (err) {
+    btn.textContent = '⚠️ error de red';
+    setTimeout(() => { btn.disabled = false; btn.textContent = accion === 'entrada' ? '✅ Entrada' : '🚪 Salida'; }, 2000);
+  }
+}
+
 async function refrescar() {
   try {
     const r = await fetch('/estado');
@@ -152,6 +269,7 @@ async function refrescar() {
         : '';
     document.getElementById('estado').innerHTML =
       `<span class="punto"></span>procesando a ${e.fps} FPS · latencia ${e.latencia_ms} ms/frame · ${e.frames} frames`;
+    refrescarBadge();
   } catch (err) { /* reintenta en el proximo tick */ }
 }
 setInterval(refrescar, 1500); refrescar();
@@ -218,6 +336,10 @@ class PanelSafeSite:
         self.marca_fps = time.time()
         self.fps = 0.0
         self.incidentes = collections.deque(maxlen=50)
+        # ---------- lector de badges QR ----------
+        self.lector_qr = LectorBadgeQR(cooldown_segundos=2.0)
+        self.ultima_lectura = None   # LecturaBadge más reciente
+        self.badge_actual = None     # dict con info del badge mostrado en pantalla
 
     # ---------- bucle de captura ----------
     def _capturar(self):
@@ -235,11 +357,28 @@ class PanelSafeSite:
             incidentes, filtradas = self.agente.procesar_frame(
                 frame, zona=self.zona, t_stamp=time.time())
             anotado = self.agente.percepcion.anotar(frame, filtradas)
+
+            # ---------- lectura de badge QR ----------
+            lecturas = self.lector_qr.detectar(frame)
             with self.lock:
                 self.ultimo_frame = anotado
                 self._conteos = self._contar(filtradas)
                 self._faltas = [d for d in filtradas
                                 if d.cls_id in config.CLASES_INCUMPLIMIENTO]
+                if lecturas:
+                    lectura = lecturas[0]
+                    self.ultima_lectura = lectura
+                    if lectura.badge and lectura.badge.valido:
+                        self.badge_actual = {
+                            "badge_id": lectura.badge.badge_id,
+                            "id_empleado": lectura.badge.id_empleado,
+                            "nombre": lectura.badge.nombre,
+                            "puesto": lectura.badge.puesto,
+                            "turno": lectura.badge.turno,
+                            "estado_badge": lectura.badge.estado_badge,
+                            "timestamp": lectura.timestamp,
+                            "activo": lectura.badge.estado_badge == "activo",
+                        }
             self.frames += 1
             ahora = time.time()
             if ahora - self.marca_fps >= 1.0:
@@ -350,6 +489,7 @@ class PanelSafeSite:
             conteos = dict(getattr(self, "_conteos", {}))
             faltas = [{"clase": d.nombre, "conf": round(d.conf, 2)}
                       for d in getattr(self, "_faltas", [])]
+            badge = dict(self.badge_actual) if self.badge_actual else None
         return {
             "zona": self.zona,
             "perfil": self.perfil,
@@ -363,7 +503,30 @@ class PanelSafeSite:
             "whatsapp_modo": (self.whatsapp_real.modo
                               if self.whatsapp_real else "DESHABILITADO"),
             "faltas_actuales": faltas,
+            "badge": badge,
         }
+
+    # ---------- endpoints de badges v2 ----------
+    def badge_estado(self):
+        """Devuelve el último badge detectado por la cámara."""
+        with self.lock:
+            return dict(self.badge_actual) if self.badge_actual else None
+
+    def badge_marcar(self, badge_id, accion):
+        """Marca entrada o salida de un badge (acción explícita desde el panel)."""
+        if accion == "entrada":
+            return registro_asistencia.marcar_entrada(badge_id)
+        if accion == "salida":
+            return registro_asistencia.marcar_salida(badge_id)
+        return {"ok": False, "detalle": "acción inválida"}
+
+    def badge_resumen(self, badge_id):
+        """Resumen completo de un badge (estado, horas, valor a pagar)."""
+        return registro_asistencia.resumen_empleado(badge_id)
+
+    def badge_todos(self):
+        """Listado de todos los empleados con su estado actual."""
+        return registro_asistencia.listar_todos()
 
 
 def main():
@@ -417,6 +580,23 @@ def main():
     @app.route("/alerta/manual", methods=["POST"])
     def alerta_manual():
         return jsonify(panel.enviar_alerta_manual())
+
+    # ---------- rutas de badges v2 ----------
+    @app.route("/badge/estado")
+    def badge_estado():
+        return jsonify(panel.badge_estado())
+
+    @app.route("/badge/marcar/<badge_id>/<accion>", methods=["POST"])
+    def badge_marcar(badge_id, accion):
+        return jsonify(panel.badge_marcar(badge_id, accion))
+
+    @app.route("/badge/resumen/<badge_id>")
+    def badge_resumen(badge_id):
+        return jsonify(panel.badge_resumen(badge_id))
+
+    @app.route("/badge/todos")
+    def badge_todos():
+        return jsonify(panel.badge_todos())
 
     panel.iniciar()
     modo_wa = (panel.whatsapp_real.modo if panel.whatsapp_real
