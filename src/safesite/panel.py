@@ -21,7 +21,7 @@ import collections
 import queue
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import cv2
 from flask import Flask, Response, jsonify
@@ -163,6 +163,13 @@ PAGINA = """<!DOCTYPE html>
   .btn-forzar { background:var(--rojo); border-color:var(--rojo); color:#fff;
             font-size:.75rem; padding:4px 10px; border-radius:6px; cursor:pointer; }
   .btn-forzar:hover { background:#b91c1c; }
+
+  /* ---------- botón exceso de jornada en esquina de cada badge ---------- */
+  .badge-exceso-wrapper { position:absolute; top:8px; right:8px; z-index:10; }
+  .btn-exceso { background:#b91c1c; border:none; color:#fff;
+            font-size:.65rem; padding:4px 8px; border-radius:6px;
+            cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.3); }
+  .btn-exceso:hover { background:#991b1b; }
   .badge-card .sub { color:var(--gris); font-size:.8rem; margin-bottom:8px; }
   .badge-card .chip { display:inline-block; padding:4px 10px; border-radius:20px;
                 font-size:.8rem; font-weight:700; margin:4px 2px; }
@@ -304,9 +311,19 @@ async function refrescarBadge() {
           </div>`;
       }
 
+      // Botón simular exceso de jornada (estándar 8h)
+      const excesoHtml = `
+        <button class="btn-exceso" data-badge="${b.badge_id}"
+                title="Simular exceso de jornada (8h)">
+          ⚠️ Exceso 8h
+        </button>`;
+
       html += `
         <div class="badge-card-multiple">
           <div class="qr-placeholder">QR</div>
+          <div class="badge-exceso-wrapper">
+            ${excesoHtml}
+          </div>
           <h2>${b.nombre || '—'}</h2>
           <div class="sub">${b.puesto || '—'}</div>
           <span class="chip ${chipClass}">${chipText}</span>
@@ -332,6 +349,9 @@ async function refrescarBadge() {
     });
     document.querySelectorAll('.btn-salida').forEach(btn => {
       btn.onclick = (e) => marcarBadge(e.target.dataset.badge, 'salida');
+    });
+    document.querySelectorAll('.btn-exceso').forEach(btn => {
+      btn.onclick = (e) => simularExcesoJornada(e.target.dataset.badge);
     });
 
     // Actualizar resúmenes de horas/pago para cada badge (fetch individual)
@@ -460,6 +480,23 @@ async function forzarSalida(badgeId) {
     if (e.ok) {
       alert(`Salida forzada registrada para ${e.nombre || badgeId}`);
       refrescar();
+    } else {
+      alert('Error: ' + (e.motivo || 'desconocido'));
+    }
+  } catch (err) {
+    alert('Error de red');
+  }
+}
+
+async function simularExcesoJornada(badgeId) {
+  if (!badgeId) return;
+  if (!confirm(`¿Simular que ${badgeId} excedió las 8 horas de jornada sin salir?`)) return;
+  try {
+    const r = await fetch('/badge/simular-exceso/' + encodeURIComponent(badgeId), {method:'POST'});
+    const e = await r.json();
+    if (e.ok) {
+      alert(`Simulado exceso de jornada para ${e.nombre || badgeId}`);
+      refrescarBadge();
     } else {
       alert('Error: ' + (e.motivo || 'desconocido'));
     }
@@ -801,6 +838,30 @@ class PanelSafeSite:
         """El administrador forza la salida de un empleado que excedió la jornada."""
         return registro_asistencia.cancelar_nomina_por_olvido_salida(badge_id)
 
+    def badge_simular_exceso(self, badge_id):
+        """Simula que un empleado excedió las 8 horas de jornada sin salir.
+        Solo con fines de prueba/demo."""
+        emp = registro_asistencia.empleado_por_badge(badge_id)
+        if emp is None:
+            return {"ok": False, "motivo": "badge_inexistente"}
+        # Forzar una entrada antigua para simular exceso de jornada
+        ahora = datetime.now()
+        desde_hace = ahora - timedelta(hours=9)  # 9 horas atrás
+        timestamp_falso = desde_hace.isoformat()
+        with registro_asistencia.lock:
+            # Registrar una entrada antigua para que parezca que lleva 9h dentro
+            registro_asistencia._estado_actual[badge_id] = {
+                "dentro": True,
+                "ultima_entrada": timestamp_falso,
+            }
+            registro_asistencia._persistir_marcacion(badge_id, "entrada", timestamp_falso)
+        return {
+            "ok": True,
+            "badge": badge_id,
+            "nombre": emp.get("nombre", ""),
+            "motivo": "simulado_exceso_jornada_8h",
+        }
+
     def badge_marcar(self, badge_id, accion):
         """Marca entrada o salida de un badge (acción explícita desde el panel)."""
         if accion == "entrada":
@@ -895,6 +956,10 @@ def main():
     @app.route("/badge/salida-forzada/<badge_id>", methods=["POST"])
     def badge_salida_forzada(badge_id):
         return jsonify(panel.badge_salida_forzada(badge_id))
+
+    @app.route("/badge/simular-exceso/<badge_id>", methods=["POST"])
+    def badge_simular_exceso(badge_id):
+        return jsonify(panel.badge_simular_exceso(badge_id))
 
     panel.iniciar()
     modo_wa = (panel.whatsapp_real.modo if panel.whatsapp_real
