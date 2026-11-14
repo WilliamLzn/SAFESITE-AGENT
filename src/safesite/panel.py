@@ -122,6 +122,37 @@ PAGINA = """<!DOCTYPE html>
                 align-items:center; justify-content:center; color:#666;
                 font-size:.65rem; border:3px solid var(--primario-color); }
   .badge-card h2 { margin:0 0 5px; font-size:1.3rem; }
+
+  /* ---------- múltiples cards de badge ---------- */
+  #badge-contenedor { display:flex; flex-direction:column; gap:10px; padding:10px 0; }
+  #badge-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+  .badge-card-multiple { background:var(--tarjeta); border-radius:12px; padding:14px;
+                text-align:center; border:2px solid var(--gris); display:flex;
+                flex-direction:column; }
+  .badge-card-multiple .chip-activo { border-color:var(--verde); background:#ecfdf5; color:var(--verde); }
+  .badge-card-multiple .chip-bloqueado { border-color:var(--rojo); background:#fef2f2; color:var(--rojo); }
+  .badge-card-multiple .qr-placeholder { width:100px; height:100px; background:#000;
+                border-radius:8px; margin:0 auto 8px; display:flex;
+                align-items:center; justify-content:center; color:#666;
+                font-size:.6rem; border:2px solid var(--primario-color); }
+  .badge-card-multiple h2 { margin:0 0 4px; font-size:1.15rem; }
+  .badge-card-multiple .sub { color:var(--gris); font-size:.75rem; margin-bottom:6px; }
+  .badge-card-multiple .chip { display:inline-block; padding:3px 8px; border-radius:16px;
+                font-size:.7rem; font-weight:700; margin:2px 1px; border:1px solid currentColor; }
+  .badge-card-multiple .epp-iconos { display:flex; gap:6px; justify-content:center; margin:8px 0 4px; flex-wrap:wrap; }
+  .badge-card-multiple .epp-icon { width:44px; height:44px; border-radius:10px; display:flex;
+                flex-direction:column; align-items:center; justify-content:center;
+                font-size:1rem; border:2px solid; }
+  .badge-card-multiple .epp-icon .nombre { font-size:.6rem; margin-top:3px; font-weight:700;
+                text-transform:uppercase; letter-spacing:.04em; }
+  .badge-card-multiple .badge-meta { font-size:.72rem; color:var(--gris); margin-top:6px; }
+  .badge-card-multiple .badge-actions { margin-top:8px; display:flex; gap:6px; justify-content:center; flex-wrap:wrap; }
+  .badge-card-multiple .resumen-badge { background:rgba(255,255,255,0.03); border-radius:8px;
+                padding:8px; margin-top:6px; text-align:left; font-size:.7rem;
+                border:1px solid rgba(255,255,255,0.08); }
+  .badge-card-multiple .resumen-badge .row { display:flex; justify-content:space-between; margin-bottom:2px; }
+  .badge-card-multiple .resumen-badge .label { color:var(--gris); }
+  .badge-card-multiple .resumen-badge .valor { font-weight:700; }
   .badge-card .sub { color:var(--gris); font-size:.8rem; margin-bottom:8px; }
   .badge-card .chip { display:inline-block; padding:4px 10px; border-radius:20px;
                 font-size:.8rem; font-weight:700; margin:4px 2px; }
@@ -155,44 +186,13 @@ PAGINA = """<!DOCTYPE html>
   </div>
 
   <div class="derecha">
-    <!-- ---------- tarjeta de badge detectado v2 (arriba) ---------- -->
-    <div class="badge-card" id="badge-card">
+    <!-- ---------- contenedor de múltiples cards de badge (arriba) ---------- -->
+    <div id="badge-contenedor">
       <div class="badge-none" id="badge-none">
         ⏳ Esperando badge QR frente a la cámara…
       </div>
-      <div id="badge-contenido" style="display:none;">
-        <div class="qr-placeholder" id="badge-qr">QR</div>
-        <h2 id="badge-nombre">—</h2>
-        <div class="sub" id="badge-puesto">—</div>
-        <span class="chip chip-activo" id="badge-chip">ACTIVO</span>
-        <div class="epp-iconos" id="badge-epp">
-          <div class="epp-icon sin-detectar" id="epp-casco">
-            🪖<span class="nombre">casco</span>
-          </div>
-          <div class="epp-icon sin-detectar" id="epp-gafas">
-            👓<span class="nombre">gafas</span>
-          </div>
-          <div class="epp-icon sin-detectar" id="epp-guantes">
-            🧤<span class="nombre">guantes</span>
-          </div>
-          <div class="epp-icon sin-detectar" id="epp-botas">
-            🥾<span class="nombre">botas</span>
-          </div>
-        </div>
-        <div style="margin-top:8px; font-size:.8rem; color:var(--gris);">
-          <div>Badge: <span id="badge-id">—</span></div>
-          <div>Turno: <span id="badge-turno">—</span></div>
-          <div>Última lectura: <span id="badge-hora">—</span></div>
-        </div>
-        <div class="badge-actions">
-          <button class="boton primario" onclick="marcarBadge('entrada')">✅ Entrada</button>
-          <button class="boton" onclick="marcarBadge('salida')">🚪 Salida</button>
-        </div>
-        <div class="resumen-badge" id="badge-resumen" style="display:none;">
-          <div class="row"><span class="label">Horas hoy:</span><span class="valor" id="badge-horas">0</span> h</div>
-          <div class="row"><span class="label">Valor a pagar:</span><span class="valor" id="badge-valor">$0</span></div>
-          <div class="row"><span class="label">Estado:</span><span class="valor" id="badge-estado">—</span></div>
-        </div>
+      <div id="badge-cards" style="display:none;">
+        <!-- Aquí se insertan dinámicamente las cards de cada badge detectado -->
       </div>
     </div>
 
@@ -240,56 +240,119 @@ async function alertaManual() {
 async function refrescarBadge() {
   try {
     const r = await fetch('/badge/estado');
-    const b = await r.json();
-    const card = document.getElementById('badge-card');
+    const badges = await r.json();
+    const contenedor = document.getElementById('badge-cards');
     const none = document.getElementById('badge-none');
-    const contenido = document.getElementById('badge-contenido');
     const tarjetasEPP = document.getElementById('tarjetas-epp');
-    if (!b || !b.badge_id) {
-      card.style.display = 'block';
+
+    if (!badges || badges.length === 0) {
+      contenedor.style.display = 'none';
       none.style.display = 'block';
-      contenido.style.display = 'none';
       tarjetasEPP.style.display = 'none';
       return;
     }
-    card.style.display = 'block';
-    none.style.display = 'none';
-    contenido.style.display = 'block';
-    // ---------- mostrar tarjetas EPP solo si el badge está activo ----------
-    tarjetasEPP.style.display = b.activo ? 'grid' : 'none';
-    document.getElementById('badge-nombre').textContent = b.nombre || '—';
-    document.getElementById('badge-puesto').textContent = b.puesto || '—';
-    document.getElementById('badge-id').textContent = b.badge_id || '—';
-    document.getElementById('badge-turno').textContent = b.turno || '—';
-    const chip = document.getElementById('badge-chip');
-    chip.textContent = b.activo ? 'ACTIVO' : 'BLOQUEADO';
-    chip.className = 'chip ' + (b.activo ? 'chip-activo' : 'chip-bloqueado');
-    const ts = b.timestamp ? new Date(b.timestamp).toLocaleTimeString('es-CO') : '—';
-    document.getElementById('badge-hora').textContent = ts;
 
-    // ---------- iconos EPP (H4) ----------
-    const epp = b.epp || {};
-    const mapeo = {casco:'epp-casco', gafas:'epp-gafas', guantes:'epp-guantes', botas:'epp-botas'};
-    Object.entries(mapeo).forEach(([clave, id]) => {
-      const el = document.getElementById(id);
-      const val = epp[clave];
-      el.className = 'epp-icon ' + (val === true ? 'tiene' : (val === false ? 'falta' : 'sin-detectar'));
+    none.style.display = 'none';
+    contenedor.style.display = 'grid';
+
+    // Construir HTML de todas las cards
+    let html = '';
+    const mapeoEPP = {casco:'epp-casco', gafas:'epp-gafas', guantes:'epp-guantes', botas:'epp-botas'};
+
+    for (const b of badges) {
+      const activo = b.activo === true;
+      const chipClass = activo ? 'chip-activo' : 'chip-bloqueado';
+      const chipText = activo ? 'ACTIVO' : 'BLOQUEADO';
+      const ts = b.timestamp ? new Date(b.timestamp).toLocaleTimeString('es-CO') : '—';
+
+      // Iconos EPP
+      const epp = b.epp || {};
+      let eppHtml = '';
+      Object.entries(mapeoEPP).forEach(([clave]) => {
+        const val = epp[clave];
+        const estadoCls = val === true ? 'tiene' : (val === false ? 'falta' : 'sin-detectar');
+        const iconos = {casco:'🪖', gafas:'👓', guantes:'🧤', botas:'🥾'};
+        eppHtml += `<div class="epp-icon ${estadoCls}" id="epp-${clave}-${b.badge_id}">
+          ${iconos[clave]||'❓'}<span class="nombre">${clave}</span>
+        </div>`;
+      });
+
+      // Resumen de horas/pago (solo si existe)
+      let resumenHtml = '';
+      if (b.existe !== false) {
+        resumenHtml = `
+          <div class="resumen-badge">
+            <div class="row"><span class="label">Horas hoy:</span><span class="valor" id="horas-${b.badge_id}">${b.horas_hoy||0}</span> h</div>
+            <div class="row"><span class="label">Valor a pagar:</span><span class="valor" id="valor-${b.badge_id}">$${(b.valor_pagar||0).toLocaleString('es-CO')}</span></div>
+            <div class="row"><span class="label">Estado:</span><span class="valor" id="estado-${b.badge_id}">${b.dentro ? 'DENTRO' : 'FUERA'}</span></div>
+          </div>`;
+      }
+
+      html += `
+        <div class="badge-card-multiple">
+          <div class="qr-placeholder">QR</div>
+          <h2>${b.nombre || '—'}</h2>
+          <div class="sub">${b.puesto || '—'}</div>
+          <span class="chip ${chipClass}">${chipText}</span>
+          <div class="epp-iconos">${eppHtml}</div>
+          <div class="badge-meta">
+            <div>Badge: ${b.badge_id || '—'}</div>
+            <div>Turno: ${b.turno || '—'}</div>
+            <div>Lectura: ${ts}</div>
+          </div>
+          <div class="badge-actions">
+            <button class="boton primario btn-entrada" data-badge="${b.badge_id}">✅ Entrada</button>
+            <button class="boton btn-salida" data-badge="${b.badge_id}">🚪 Salida</button>
+          </div>
+          ${resumenHtml}
+        </div>`;
+    }
+
+    contenedor.innerHTML = html;
+
+    // Vincular eventos de botones dinámicos
+    document.querySelectorAll('.btn-entrada').forEach(btn => {
+      btn.onclick = (e) => marcarBadge(e.target.dataset.badge, 'entrada');
+    });
+    document.querySelectorAll('.btn-salida').forEach(btn => {
+      btn.onclick = (e) => marcarBadge(e.target.dataset.badge, 'salida');
     });
 
-    // resumen de horas/pago
-    try {
-      const r2 = await fetch('/badge/resumen/' + encodeURIComponent(b.badge_id));
-      const s = await r2.json();
-      if (s.existe) {
-        document.getElementById('badge-horas').textContent = s.horas_hoy || 0;
-        document.getElementById('badge-valor').textContent = '$' + (s.valor_pagar || 0).toLocaleString('es-CO');
-        document.getElementById('badge-estado').textContent = s.dentro ? 'DENTRO' : 'FUERA';
-        document.getElementById('badge-resumen').style.display = 'block';
-      } else {
-        document.getElementById('badge-resumen').style.display = 'none';
+    // Actualizar resúmenes de horas/pago para cada badge (fetch individual)
+    for (const b of badges) {
+      if (b.badge_id) {
+        try {
+          const r2 = await fetch('/badge/resumen/' + encodeURIComponent(b.badge_id));
+          const s = await r2.json();
+          if (s.existe) {
+            const h = document.getElementById(`horas-${b.badge_id}`);
+            const v = document.getElementById(`valor-${b.badge_id}`);
+            const e = document.getElementById(`estado-${b.badge_id}`);
+            if (h) h.textContent = s.horas_hoy || 0;
+            if (v) v.textContent = '$' + (s.valor_pagar || 0).toLocaleString('es-CO');
+            if (e) e.textContent = s.dentro ? 'DENTRO' : 'FUERA';
+          }
+        } catch (err) { /* resumen opcional */ }
       }
-    } catch (err) { /* resumen opcional */ }
+    }
+
   } catch (err) { /* reintenta en el proximo tick */ }
+}
+
+async function marcarBadge(badgeId, accion) {
+  if (!badgeId || badgeId === '—') return;
+  try {
+    const r = await fetch('/badge/marcar/' + encodeURIComponent(badgeId) + '/' + accion, {method:'POST'});
+    const e = await r.json();
+    if (e.ok) {
+      // Refrescar para mostrar el nuevo estado
+      setTimeout(() => { refrescarBadge(); }, 800);
+    } else {
+      console.warn('Error marcando badge:', e.motivo || 'error');
+    }
+  } catch (err) {
+    console.warn('Error de red marcando badge:', err);
+  }
 }
 
 async function marcarBadge(accion) {
@@ -410,9 +473,11 @@ class PanelSafeSite:
         self.fps = 0.0
         self.incidentes = collections.deque(maxlen=50)
         # ---------- lector de badges QR ----------
-        self.lector_qr = LectorBadgeQR(cooldown_segundos=2.0)
+        self.lector_qr = LectorBadgeQR(cooldown_segundos=2.0,
+                                       detectar_cada_n_frames=3)
         self.ultima_lectura = None   # LecturaBadge más reciente
-        self.badge_actual = None     # dict con info del badge mostrado en pantalla
+        self.badges_activos = {}     # badge_id -> {"datos": dict, "ultima_deteccion": float}
+        self.BADGE_TIEMPO_VISIBLE_S = 10.0  # segundos que se mantiene visible una card tras ser detectada
 
     # ---------- bucle de captura ----------
     def _capturar(self):
@@ -467,48 +532,57 @@ class PanelSafeSite:
                     cv2.putText(anotado, etiqueta, (x1, max(y1 - 10, 20)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
+            ahora_ts = time.time()
+
             with self.lock:
                 self.ultimo_frame = anotado
+
+                # ---------- gestionar múltiples badges activos con timeout ----------
+                # Limpiar badges expirados (más de BADGE_TIEMPO_VISIBLE_S sin ser detectados)
+                expirados = [bid for bid, d in self.badges_activos.items()
+                             if ahora_ts - d["ultima_deteccion"] > self.BADGE_TIEMPO_VISIBLE_S]
+                for bid in expirados:
+                    del self.badges_activos[bid]
+
                 if lecturas:
-                    lectura = lecturas[0]
-                    if (lectura.badge and lectura.badge.valido
-                            and lectura.badge.estado_badge == "activo"):
-                        # ---------- estado EPP del mismo frame (H4) ----------
-                        epp = self._estado_epp(filtradas)
-                        self.badge_actual = {
-                            "badge_id": lectura.badge.badge_id,
-                            "id_empleado": lectura.badge.id_empleado,
-                            "nombre": lectura.badge.nombre,
-                            "puesto": lectura.badge.puesto,
-                            "turno": lectura.badge.turno,
-                            "estado_badge": lectura.badge.estado_badge,
-                            "timestamp": lectura.badge.timestamp,
-                            "activo": True,
-                            "epp": epp,
+                    for lectura in lecturas:
+                        if not lectura.badge:
+                            continue
+                        bid = lectura.badge.badge_id
+
+                        # Construir datos del badge para el frontend
+                        if lectura.badge.valido:
+                            epp = self._estado_epp(filtradas) \
+                                if lectura.badge.estado_badge == "activo" else None
+                            datos = {
+                                "badge_id": lectura.badge.badge_id,
+                                "id_empleado": lectura.badge.id_empleado,
+                                "nombre": lectura.badge.nombre,
+                                "puesto": lectura.badge.puesto,
+                                "turno": lectura.badge.turno,
+                                "estado_badge": lectura.badge.estado_badge,
+                                "timestamp": lectura.badge.timestamp,
+                                "activo": lectura.badge.estado_badge == "activo",
+                                "epp": epp,
+                            }
+                        else:
+                            datos = {
+                                "badge_id": lectura.badge.badge_id or "?",
+                                "id_empleado": "",
+                                "nombre": "DESCONOCIDO",
+                                "puesto": "",
+                                "turno": "",
+                                "estado_badge": lectura.badge.estado_badge or "desconocido",
+                                "timestamp": lectura.badge.timestamp or ahora_ts,
+                                "activo": False,
+                                "epp": None,
+                            }
+
+                        # Guardar o actualizar el badge activo
+                        self.badges_activos[bid] = {
+                            "datos": datos,
+                            "ultima_deteccion": ahora_ts,
                         }
-                    else:
-                        # QR leído pero badge no válido o no activo:
-                        # mostrar tarjeta bloqueada, sin EPP
-                        self.badge_actual = {
-                            "badge_id": lectura.badge.badge_id
-                            if lectura.badge else "?",
-                            "id_empleado": lectura.badge.id_empleado
-                            if lectura.badge else "",
-                            "nombre": lectura.badge.nombre
-                            if lectura.badge else "DESCONOCIDO",
-                            "puesto": lectura.badge.puesto
-                            if lectura.badge else "",
-                            "turno": lectura.badge.turno
-                            if lectura.badge else "",
-                            "estado_badge": lectura.badge.estado_badge
-                            if lectura.badge else "desconocido",
-                            "timestamp": lectura.badge.timestamp
-                            if lectura.badge else time.time(),
-                            "activo": False,
-                            "epp": None,
-                        }
-                else:
-                    self.badge_actual = None
             self.frames += 1
             ahora = time.time()
             if ahora - self.marca_fps >= 1.0:
@@ -637,7 +711,11 @@ class PanelSafeSite:
             conteos = dict(getattr(self, "_conteos", {}))
             faltas = [{"clase": d.nombre, "conf": round(d.conf, 2)}
                       for d in getattr(self, "_faltas", [])]
-            badge = dict(self.badge_actual) if self.badge_actual else None
+            ahora = time.time()
+            badges_lista = []
+            for bid, d in self.badges_activos.items():
+                if ahora - d["ultima_deteccion"] <= self.BADGE_TIEMPO_VISIBLE_S:
+                    badges_lista.append(d["datos"])
         return {
             "zona": self.zona,
             "perfil": self.perfil,
@@ -651,14 +729,21 @@ class PanelSafeSite:
             "whatsapp_modo": (self.whatsapp_real.modo
                               if self.whatsapp_real else "DESHABILITADO"),
             "faltas_actuales": faltas,
-            "badge": badge,
+            "badges": badges_lista,
+            "badge": badges_lista[0] if badges_lista else None,  # compatibilidad
         }
 
     # ---------- endpoints de badges v2 ----------
     def badge_estado(self):
-        """Devuelve el último badge detectado por la cámara."""
+        """Devuelve la lista de badges activos detectados (cada uno con su card)."""
         with self.lock:
-            return dict(self.badge_actual) if self.badge_actual else None
+            ahora = time.time()
+            # Filtrar solo los que aún no expiran
+            activos = {}
+            for bid, d in self.badges_activos.items():
+                if ahora - d["ultima_deteccion"] <= self.BADGE_TIEMPO_VISIBLE_S:
+                    activos[bid] = d["datos"]
+            return list(activos.values())
 
     def badge_marcar(self, badge_id, accion):
         """Marca entrada o salida de un badge (acción explícita desde el panel)."""

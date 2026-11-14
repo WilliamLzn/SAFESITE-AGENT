@@ -57,16 +57,20 @@ class LectorBadgeQR:
     """Lee QRs de badges desde fotogramas de la cámara con múltiples
     estrategias de preprocesamiento para mejorar la detección."""
 
-    def __init__(self, cooldown_segundos=1.5, cooldown_fallido=0.5):
+    def __init__(self, cooldown_segundos=2.0, cooldown_fallido=0.5,
+                 detectar_cada_n_frames=3):
         """
         cooldown_segundos: tiempo mínimo entre lecturas exitosas del mismo
                            badge (evita re-leer constantemente).
         cooldown_fallido: tiempo mínimo entre intentos de lectura fallida
                           del mismo badge (evita saturar la CPU).
+        detectar_cada_n_frames: ejecutar detección QR cada N frames (ahorra CPU).
         """
         self.detector = cv2.QRCodeDetector()
         self.cooldown_segundos = cooldown_segundos
         self.cooldown_fallido = cooldown_fallido
+        self.detectar_cada_n_frames = detectar_cada_n_frames
+        self._contador_frames = 0
         self._ultima_lectura_por_badge = {}   # badge_id -> timestamp
         self._ultimo_intento_por_badge = {}   # badge_id -> timestamp (fallido)
         self._ultimo_badge_id = None          # último badge leído (cualquiera)
@@ -181,12 +185,19 @@ class LectorBadgeQR:
     def detectar(self, frame):
         """Detecta y decodifica QRs en un frame usando múltiples estrategias.
 
+        Solo ejecuta la detección completa cada `detectar_cada_n_frames` frames
+        para ahorrar CPU y mejorar los FPS de la cámara.
+
         Devuelve lista[LecturaBadge] (puede estar vacía).
         """
+        self._contador_frames += 1
+        if self._contador_frames % self.detectar_cada_n_frames != 0:
+            return []  # saltar este frame para no saturar la CPU
+
         ahora = time.time()
         lecturas: List[LecturaBadge] = []
 
-        # Generar versiones preprocesadas del frame
+        # Generar versiones preprocesadas del frame (versiones reducidas para velocidad)
         versiones = self._preprocesar(frame)
 
         for versión in versiones:
