@@ -44,10 +44,11 @@ PAGINA = """<!DOCTYPE html>
          sans-serif; margin:0; padding:20px; }
   h1 { font-size:1.4rem; margin:0 0 4px; }
   .sub { color:var(--gris); font-size:.85rem; margin-bottom:16px; }
-  .layout { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
+  .layout { display:grid; grid-template-columns:42% 58%; gap:16px;
+            grid-template-rows: auto; }
   @media (max-width:900px){ .layout{grid-template-columns:1fr;} }
-  .video { width:100%; border-radius:10px; background:#000; aspect-ratio:4/3;
-           object-fit:contain; }
+  .video { width:100%; max-width:640px; border-radius:10px; background:#000;
+           aspect-ratio:4/3; object-fit:contain; display:block; margin:0 auto; }
   .tarjetas { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
               gap:8px; margin-top:12px; }
   .tarjeta { background:var(--tarjeta); border-radius:10px; padding:10px;
@@ -108,6 +109,34 @@ PAGINA = """<!DOCTYPE html>
   .epp-icon.sin-detectar { border-color:var(--gris); background:#f1f5f9; color:var(--gris); }
   .epp-icon .nombre { font-size:.65rem; margin-top:4px; font-weight:700;
               text-transform:uppercase; letter-spacing:.05em; }
+
+  /* ---------- columna derecha dividida: badge arriba, incidentes abajo ---------- */
+  .derecha { display:grid; grid-template-rows: 1fr 1fr; gap:16px; height:100%; }
+  .derecha > div { background:var(--tarjeta); border-radius:10px; overflow:auto; }
+  .derecha .panel-incidentes { padding:14px; }
+  .badge-card { background:var(--tarjeta); border-radius:14px; padding:16px;
+                margin:0; text-align:center; border:2px solid var(--gris);
+                height:100%; display:flex; flex-direction:column; }
+  .badge-card .qr-placeholder { width:120px; height:120px; background:#000;
+                border-radius:10px; margin:0 auto 10px; display:flex;
+                align-items:center; justify-content:center; color:#666;
+                font-size:.65rem; border:3px solid var(--primario-color); }
+  .badge-card h2 { margin:0 0 5px; font-size:1.3rem; }
+  .badge-card .sub { color:var(--gris); font-size:.8rem; margin-bottom:8px; }
+  .badge-card .chip { display:inline-block; padding:4px 10px; border-radius:20px;
+                font-size:.8rem; font-weight:700; margin:4px 2px; }
+  .chip-activo { background:var(--verde); color:#fff; }
+  .chip-bloqueado { background:var(--rojo); color:#fff; }
+  .badge-actions { margin-top:10px; display:flex; gap:8px; justify-content:center;
+                flex-wrap:wrap; }
+  .badge-none { color:var(--gris); font-style:italic; text-align:center;
+                padding:30px 10px; flex:1; }
+  .resumen-badge { background:rgba(255,255,255,0.03); border-radius:8px;
+                padding:10px; margin-top:10px; text-align:left; font-size:.8rem;
+                border:1px solid rgba(255,255,255,0.08); }
+  .resumen-badge .row { display:flex; justify-content:space-between; margin-bottom:3px; }
+  .resumen-badge .label { color:var(--gris); }
+  .resumen-badge .valor { font-weight:700; }
 </style></head><body>
 <h1>👷 SafeSite-Agent — Supervisión en vivo</h1>
 <div class="sub" id="sub">conectando con la cámara…</div>
@@ -117,58 +146,62 @@ PAGINA = """<!DOCTYPE html>
   <span class="faltas-badge" id="faltas-badge"></span>
 </div>
 
-<!-- ---------- tarjeta de badge detectado v2 ---------- -->
-<div class="badge-card" id="badge-card">
-  <div class="badge-none" id="badge-none">
-    ⏳ Esperando badge QR frente a la cámara…
-  </div>
-  <div id="badge-contenido" style="display:none;">
-    <div class="qr-placeholder" id="badge-qr">QR</div>
-    <h2 id="badge-nombre">—</h2>
-    <div class="sub" id="badge-puesto">—</div>
-    <span class="chip chip-activo" id="badge-chip">ACTIVO</span>
-    <div class="epp-iconos" id="badge-epp">
-      <div class="epp-icon sin-detectar" id="epp-casco">
-        🪖<span class="nombre">casco</span>
-      </div>
-      <div class="epp-icon sin-detectar" id="epp-gafas">
-        👓<span class="nombre">gafas</span>
-      </div>
-      <div class="epp-icon sin-detectar" id="epp-guantes">
-        🧤<span class="nombre">guantes</span>
-      </div>
-      <div class="epp-icon sin-detectar" id="epp-botas">
-        🥾<span class="nombre">botas</span>
-      </div>
-    </div>
-    <div style="margin-top:8px; font-size:.85rem; color:var(--gris);">
-      <div>Badge: <span id="badge-id">—</span></div>
-      <div>Turno: <span id="badge-turno">—</span></div>
-      <div>Última lectura: <span id="badge-hora">—</span></div>
-    </div>
-    <div class="badge-actions">
-      <button class="boton primario" onclick="marcarBadge('entrada')">✅ Entrada</button>
-      <button class="boton" onclick="marcarBadge('salida')">🚪 Salida</button>
-    </div>
-    <div class="resumen-badge" id="badge-resumen" style="display:none;">
-      <div class="row"><span class="label">Horas hoy:</span><span class="valor" id="badge-horas">0</span> h</div>
-      <div class="row"><span class="label">Valor a pagar:</span><span class="valor" id="badge-valor">$0</span></div>
-      <div class="row"><span class="label">Estado:</span><span class="valor" id="badge-estado">—</span></div>
-    </div>
-  </div>
-</div>
-
 <div class="layout">
-  <div>
+  <div class="izquierda">
     <img class="video" src="/video" alt="video en vivo">
     <div id="tarjetas-epp" style="display:none;">
       <div class="tarjetas" id="tarjetas"></div>
     </div>
   </div>
-  <div class="panel">
-    <h2>🚨 Incidentes confirmados</h2>
-    <div id="log"><div class="vacio">sin incidentes todavía…</div></div>
-    <div class="estado-linea" id="estado"></div>
+
+  <div class="derecha">
+    <!-- ---------- tarjeta de badge detectado v2 (arriba) ---------- -->
+    <div class="badge-card" id="badge-card">
+      <div class="badge-none" id="badge-none">
+        ⏳ Esperando badge QR frente a la cámara…
+      </div>
+      <div id="badge-contenido" style="display:none;">
+        <div class="qr-placeholder" id="badge-qr">QR</div>
+        <h2 id="badge-nombre">—</h2>
+        <div class="sub" id="badge-puesto">—</div>
+        <span class="chip chip-activo" id="badge-chip">ACTIVO</span>
+        <div class="epp-iconos" id="badge-epp">
+          <div class="epp-icon sin-detectar" id="epp-casco">
+            🪖<span class="nombre">casco</span>
+          </div>
+          <div class="epp-icon sin-detectar" id="epp-gafas">
+            👓<span class="nombre">gafas</span>
+          </div>
+          <div class="epp-icon sin-detectar" id="epp-guantes">
+            🧤<span class="nombre">guantes</span>
+          </div>
+          <div class="epp-icon sin-detectar" id="epp-botas">
+            🥾<span class="nombre">botas</span>
+          </div>
+        </div>
+        <div style="margin-top:8px; font-size:.8rem; color:var(--gris);">
+          <div>Badge: <span id="badge-id">—</span></div>
+          <div>Turno: <span id="badge-turno">—</span></div>
+          <div>Última lectura: <span id="badge-hora">—</span></div>
+        </div>
+        <div class="badge-actions">
+          <button class="boton primario" onclick="marcarBadge('entrada')">✅ Entrada</button>
+          <button class="boton" onclick="marcarBadge('salida')">🚪 Salida</button>
+        </div>
+        <div class="resumen-badge" id="badge-resumen" style="display:none;">
+          <div class="row"><span class="label">Horas hoy:</span><span class="valor" id="badge-horas">0</span> h</div>
+          <div class="row"><span class="label">Valor a pagar:</span><span class="valor" id="badge-valor">$0</span></div>
+          <div class="row"><span class="label">Estado:</span><span class="valor" id="badge-estado">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- incidentes confirmados (abajo) ---------- -->
+    <div class="panel panel-incidentes">
+      <h2>🚨 Incidentes confirmados</h2>
+      <div id="log"><div class="vacio">sin incidentes todavía…</div></div>
+      <div class="estado-linea" id="estado"></div>
+    </div>
   </div>
 </div>
 <script>
