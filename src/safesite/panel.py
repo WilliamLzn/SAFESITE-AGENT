@@ -348,7 +348,7 @@ class ActuadorWhatsAppAsync(ActuadorWhatsApp):
 
 
 class PanelSafeSite:
-    def __init__(self, zona, device, usar_whatsapp=True, perfil="vivo"):
+    def __init__(self, zona, device, usar_whatsapp=False, perfil="vivo"):
         self.zona = zona
         self.perfil = perfil
         self.cola = queue.Queue()
@@ -654,12 +654,12 @@ def main():
                         choices=("vivo", "evaluacion"),
                         help="umbrales por clase: vivo (calibrado en piloto) "
                              "o evaluacion (umbral global 0.15 de la suite)")
-    parser.add_argument("--sin-whatsapp", action="store_true",
-                        help="desactiva el envío real de WhatsApp")
+    parser.add_argument("--con-whatsapp", action="store_true",
+                        help="activa el envío real de WhatsApp (desactivado por defecto)")
     args = parser.parse_args()
 
     panel = PanelSafeSite(args.zona, args.device,
-                          usar_whatsapp=not args.sin_whatsapp,
+                          usar_whatsapp=args.con_whatsapp,
                           perfil=args.perfil)
     app = Flask(__name__)
 
