@@ -153,6 +153,16 @@ PAGINA = """<!DOCTYPE html>
   .badge-card-multiple .resumen-badge .row { display:flex; justify-content:space-between; margin-bottom:2px; }
   .badge-card-multiple .resumen-badge .label { color:var(--gris); }
   .badge-card-multiple .resumen-badge .valor { font-weight:700; }
+
+  /* ---------- alertas de jornada ---------- */
+  .alerta-jornada { border-left:4px solid var(--rojo); padding:8px 10px;
+            margin-bottom:6px; background:#fef2f2; border-radius:6px; }
+  .alerta-jornada .hora { color:var(--rojo); font-size:.7rem; font-weight:700; }
+  .alerta-jornada .nombre { font-weight:700; color:var(--texto); }
+  .alerta-jornada .detalle { font-size:.75rem; color:var(--gris); margin-top:4px; }
+  .btn-forzar { background:var(--rojo); border-color:var(--rojo); color:#fff;
+            font-size:.75rem; padding:4px 10px; border-radius:6px; cursor:pointer; }
+  .btn-forzar:hover { background:#b91c1c; }
   .badge-card .sub { color:var(--gris); font-size:.8rem; margin-bottom:8px; }
   .badge-card .chip { display:inline-block; padding:4px 10px; border-radius:20px;
                 font-size:.8rem; font-weight:700; margin:4px 2px; }
@@ -201,6 +211,12 @@ PAGINA = """<!DOCTYPE html>
       <h2>🚨 Incidentes confirmados</h2>
       <div id="log"><div class="vacio">sin incidentes todavía…</div></div>
       <div class="estado-linea" id="estado"></div>
+    </div>
+
+    <!-- ---------- alertas de jornada sin salida ---------- -->
+    <div class="panel panel-incidentes">
+      <h2>⚠️ Alertas de jornada</h2>
+      <div id="log-jornada"><div class="vacio">sin alertas de jornada…</div></div>
     </div>
   </div>
 </div>
@@ -406,8 +422,52 @@ async function refrescar() {
     document.getElementById('estado').innerHTML =
       `<span class="punto"></span>procesando a ${e.fps} FPS · latencia ${e.latencia_ms} ms/frame · ${e.frames} frames`;
     refrescarBadge();
+    refrescarJornadaAlertas(e.alertas_jornada || []);
   } catch (err) { /* reintenta en el proximo tick */ }
 }
+
+async function refrescarJornadaAlertas(alertas) {
+  const cont = document.getElementById('log-jornada');
+  if (!alertas || alertas.length === 0) {
+    cont.innerHTML = '<div class="vacio">sin alertas de jornada…</div>';
+    return;
+  }
+  cont.innerHTML = alertas.map(a => {
+    const excede = a.excede_jornada_maxima ? ' (EXCEDE JORNADA MÁXIMA)' : '';
+    return `
+      <div class="alerta-jornada">
+        <div class="hora">⚠️ ${a.nombre || 'Desconocido'} (${a.badge_id})${excede}</div>
+        <div class="detalle">
+          Entró: ${a.hora_entrada ? new Date(a.hora_entrada).toLocaleTimeString('es-CO') : '—'} ·
+          Horas dentro: ${a.horas_dentro} h ·
+          Turno: ${a.turno || '—'} ·
+          Puesto: ${a.puesto || '—'}
+        </div>
+        ${a.excede_jornada_maxima
+          ? `<button class="btn-forzar" onclick="forzarSalida('${a.badge_id}')">Forzar salida y cancelar nómina</button>`
+          : '<span style="color:var(--gris); font-size:.7rem;">Aún dentro de la jornada máxima</span>'
+        }
+      </div>`;
+  }).join('');
+}
+
+async function forzarSalida(badgeId) {
+  if (!badgeId) return;
+  if (!confirm(`¿Forzar salida y cancelar nómina del badge ${badgeId}?`)) return;
+  try {
+    const r = await fetch('/badge/salida-forzada/' + encodeURIComponent(badgeId), {method:'POST'});
+    const e = await r.json();
+    if (e.ok) {
+      alert(`Salida forzada registrada para ${e.nombre || badgeId}`);
+      refrescar();
+    } else {
+      alert('Error: ' + (e.motivo || 'desconocido'));
+    }
+  } catch (err) {
+    alert('Error de red');
+  }
+}
+
 setInterval(refrescar, 1500); refrescar();
 </script></body></html>"""
 
@@ -477,7 +537,8 @@ class PanelSafeSite:
                                        detectar_cada_n_frames=3)
         self.ultima_lectura = None   # LecturaBadge más reciente
         self.badges_activos = {}     # badge_id -> {"datos": dict, "ultima_deteccion": float}
-        self.BADGE_TIEMPO_VISIBLE_S = 10.0  # segundos que se mantiene visible una card tras ser detectada
+        # Las cards de badge se mantienen visibles hasta que el trabajador
+        # marque salida (no expiran por tiempo).
 
     # ---------- bucle de captura ----------
     def _capturar(self):
@@ -532,18 +593,11 @@ class PanelSafeSite:
                     cv2.putText(anotado, etiqueta, (x1, max(y1 - 10, 20)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
-            ahora_ts = time.time()
-
             with self.lock:
                 self.ultimo_frame = anotado
 
-                # ---------- gestionar múltiples badges activos con timeout ----------
-                # Limpiar badges expirados (más de BADGE_TIEMPO_VISIBLE_S sin ser detectados)
-                expirados = [bid for bid, d in self.badges_activos.items()
-                             if ahora_ts - d["ultima_deteccion"] > self.BADGE_TIEMPO_VISIBLE_S]
-                for bid in expirados:
-                    del self.badges_activos[bid]
-
+                # ---------- gestionar múltiples badges activos (sin expiración por tiempo) ----------
+                # Las cards se mantienen visibles hasta que el trabajador marque salida.
                 if lecturas:
                     for lectura in lecturas:
                         if not lectura.badge:
@@ -578,7 +632,7 @@ class PanelSafeSite:
                                 "epp": None,
                             }
 
-                        # Guardar o actualizar el badge activo
+                        # Guardar o actualizar el badge activo (se mantiene hasta salida)
                         self.badges_activos[bid] = {
                             "datos": datos,
                             "ultima_deteccion": ahora_ts,
@@ -711,11 +765,9 @@ class PanelSafeSite:
             conteos = dict(getattr(self, "_conteos", {}))
             faltas = [{"clase": d.nombre, "conf": round(d.conf, 2)}
                       for d in getattr(self, "_faltas", [])]
-            ahora = time.time()
-            badges_lista = []
-            for bid, d in self.badges_activos.items():
-                if ahora - d["ultima_deteccion"] <= self.BADGE_TIEMPO_VISIBLE_S:
-                    badges_lista.append(d["datos"])
+            badges_lista = [d["datos"] for d in self.badges_activos.values()]
+        # Alertas de jornada sin salida (fuera del lock para no bloquear)
+        alertas_jornada = registro_asistencia.obtener_jornadas_sin_salida()
         return {
             "zona": self.zona,
             "perfil": self.perfil,
@@ -731,19 +783,23 @@ class PanelSafeSite:
             "faltas_actuales": faltas,
             "badges": badges_lista,
             "badge": badges_lista[0] if badges_lista else None,  # compatibilidad
+            "alertas_jornada": alertas_jornada,
         }
 
     # ---------- endpoints de badges v2 ----------
     def badge_estado(self):
-        """Devuelve la lista de badges activos detectados (cada uno con su card)."""
+        """Devuelve la lista de badges activos detectados (cada uno con su card).
+        Las cards se mantienen visibles hasta que el trabajador marque salida."""
         with self.lock:
-            ahora = time.time()
-            # Filtrar solo los que aún no expiran
-            activos = {}
-            for bid, d in self.badges_activos.items():
-                if ahora - d["ultima_deteccion"] <= self.BADGE_TIEMPO_VISIBLE_S:
-                    activos[bid] = d["datos"]
-            return list(activos.values())
+            return [d["datos"] for d in self.badges_activos.values()]
+
+    def badge_jornada_alertas(self):
+        """Devuelve alertas de empleados que excedieron la jornada sin salir."""
+        return registro_asistencia.obtener_jornadas_sin_salida()
+
+    def badge_salida_forzada(self, badge_id):
+        """El administrador forza la salida de un empleado que excedió la jornada."""
+        return registro_asistencia.cancelar_nomina_por_olvido_salida(badge_id)
 
     def badge_marcar(self, badge_id, accion):
         """Marca entrada o salida de un badge (acción explícita desde el panel)."""
@@ -830,6 +886,15 @@ def main():
     @app.route("/badge/todos")
     def badge_todos():
         return jsonify(panel.badge_todos())
+
+    # ---------- rutas de jornada y salida forzada ----------
+    @app.route("/badge/jornada-alertas")
+    def badge_jornada_alertas():
+        return jsonify(panel.badge_jornada_alertas())
+
+    @app.route("/badge/salida-forzada/<badge_id>", methods=["POST"])
+    def badge_salida_forzada(badge_id):
+        return jsonify(panel.badge_salida_forzada(badge_id))
 
     panel.iniciar()
     modo_wa = (panel.whatsapp_real.modo if panel.whatsapp_real
