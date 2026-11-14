@@ -161,7 +161,9 @@ PAGINA = """<!DOCTYPE html>
 <div class="layout">
   <div>
     <img class="video" src="/video" alt="video en vivo">
-    <div class="tarjetas" id="tarjetas"></div>
+    <div id="tarjetas-epp" style="display:none;">
+      <div class="tarjetas" id="tarjetas"></div>
+    </div>
   </div>
   <div class="panel">
     <h2>🚨 Incidentes confirmados</h2>
@@ -209,15 +211,19 @@ async function refrescarBadge() {
     const card = document.getElementById('badge-card');
     const none = document.getElementById('badge-none');
     const contenido = document.getElementById('badge-contenido');
+    const tarjetasEPP = document.getElementById('tarjetas-epp');
     if (!b || !b.badge_id) {
       card.style.display = 'block';
       none.style.display = 'block';
       contenido.style.display = 'none';
+      tarjetasEPP.style.display = 'none';
       return;
     }
     card.style.display = 'block';
     none.style.display = 'none';
     contenido.style.display = 'block';
+    // ---------- mostrar tarjetas EPP solo si el badge está activo ----------
+    tarjetasEPP.style.display = b.activo ? 'grid' : 'none';
     document.getElementById('badge-nombre').textContent = b.nombre || '—';
     document.getElementById('badge-puesto').textContent = b.puesto || '—';
     document.getElementById('badge-id').textContent = b.badge_id || '—';
@@ -388,21 +394,52 @@ class PanelSafeSite:
             if not ok:
                 time.sleep(0.05)
                 continue
-            incidentes, filtradas = self.agente.procesar_frame(
-                frame, zona=self.zona, t_stamp=time.time())
-            anotado = self.agente.percepcion.anotar(frame, filtradas)
 
-            # ---------- lectura de badge QR ----------
+            # ---------- lectura de badge QR (siempre) ----------
             lecturas = self.lector_qr.detectar(frame)
-            with self.lock:
-                self.ultimo_frame = anotado
+
+            # Solo procesar EPP (YOLO) si hay un badge ACTIVO detectado
+            hay_badge_activo = False
+            if lecturas:
+                lectura = lecturas[0]
+                self.ultima_lectura = lectura
+                if (lectura.badge and lectura.badge.valido
+                        and lectura.badge.estado_badge == "activo"):
+                    hay_badge_activo = True
+
+            if hay_badge_activo:
+                incidentes, filtradas = self.agente.procesar_frame(
+                    frame, zona=self.zona, t_stamp=time.time())
+                anotado = self.agente.percepcion.anotar(frame, filtradas)
                 self._conteos = self._contar(filtradas)
                 self._faltas = [d for d in filtradas
                                 if d.cls_id in config.CLASES_INCUMPLIMIENTO]
+            else:
+                incidentes = []
+                filtradas = []
+                anotado = frame.copy()
+                self._conteos = {}
+                self._faltas = []
+
+            # ---------- recuadro del QR (siempre visible al detectar) ----------
+            if lecturas:
+                lectura = lecturas[0]
+                if lectura.caja:
+                    x1, y1, x2, y2 = [int(v) for v in lectura.caja]
+                    es_valido = (lectura.badge is not None
+                                 and lectura.badge.valido)
+                    color = (0, 200, 0) if es_valido else (0, 0, 200)
+                    cv2.rectangle(anotado, (x1, y1), (x2, y2), color, 3)
+                    etiqueta = "QR VALIDO" if es_valido else "QR"
+                    cv2.putText(anotado, etiqueta, (x1, max(y1 - 10, 20)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+            with self.lock:
+                self.ultimo_frame = anotado
                 if lecturas:
                     lectura = lecturas[0]
-                    self.ultima_lectura = lectura
-                    if lectura.badge and lectura.badge.valido:
+                    if (lectura.badge and lectura.badge.valido
+                            and lectura.badge.estado_badge == "activo"):
                         # ---------- estado EPP del mismo frame (H4) ----------
                         epp = self._estado_epp(filtradas)
                         self.badge_actual = {
@@ -413,9 +450,32 @@ class PanelSafeSite:
                             "turno": lectura.badge.turno,
                             "estado_badge": lectura.badge.estado_badge,
                             "timestamp": lectura.badge.timestamp,
-                            "activo": lectura.badge.estado_badge == "activo",
+                            "activo": True,
                             "epp": epp,
                         }
+                    else:
+                        # QR leído pero badge no válido o no activo:
+                        # mostrar tarjeta bloqueada, sin EPP
+                        self.badge_actual = {
+                            "badge_id": lectura.badge.badge_id
+                            if lectura.badge else "?",
+                            "id_empleado": lectura.badge.id_empleado
+                            if lectura.badge else "",
+                            "nombre": lectura.badge.nombre
+                            if lectura.badge else "DESCONOCIDO",
+                            "puesto": lectura.badge.puesto
+                            if lectura.badge else "",
+                            "turno": lectura.badge.turno
+                            if lectura.badge else "",
+                            "estado_badge": lectura.badge.estado_badge
+                            if lectura.badge else "desconocido",
+                            "timestamp": lectura.badge.timestamp
+                            if lectura.badge else time.time(),
+                            "activo": False,
+                            "epp": None,
+                        }
+                else:
+                    self.badge_actual = None
             self.frames += 1
             ahora = time.time()
             if ahora - self.marca_fps >= 1.0:
