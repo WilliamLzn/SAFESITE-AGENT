@@ -53,7 +53,7 @@ PAGINA = """<!DOCTYPE html>
   /* ---------- contenedor scrollable de badges (independiente del resto) ---------- */
   #badge-contenedor { height: 420px; overflow-y: auto; border: 1px solid var(--gris);
              border-radius: 10px; background: rgba(30,41,59,0.6);
-             display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+             display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 10px; }
   #badge-contenedor::-webkit-scrollbar { width: 8px; }
   #badge-contenedor::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
   #badge-contenedor::-webkit-scrollbar-thumb { background: var(--gris); border-radius: 4px; }
@@ -175,8 +175,7 @@ PAGINA = """<!DOCTYPE html>
   .badge-card h2 { margin:0 0 5px; font-size:1.3rem; }
 
   /* ---------- múltiples cards de badge ---------- */
-  #badge-contenedor { display:flex; flex-direction:column; gap:10px; padding:10px 0; }
-  #badge-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+  #badge-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
   .badge-card-multiple { background:var(--tarjeta); border-radius:12px; padding:14px;
                 text-align:center; border:2px solid var(--gris); display:flex;
                 flex-direction:column; }
@@ -330,7 +329,7 @@ async function refrescarBadge() {
     }
 
     none.style.display = 'none';
-    contenedor.style.display = 'flex';
+    contenedor.style.display = 'grid';
 
     // Construir HTML de TODAS las cards (30 empleados siempre visibles)
     let html = '';
