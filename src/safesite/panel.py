@@ -49,6 +49,57 @@ PAGINA = """<!DOCTYPE html>
   @media (max-width:900px){ .layout{grid-template-columns:1fr;} }
   .video { width:100%; max-width:640px; border-radius:10px; background:#000;
            aspect-ratio:4/3; object-fit:contain; display:block; margin:0 auto; }
+
+  /* ---------- contenedor scrollable de badges (independiente del resto) ---------- */
+  #badge-contenedor { height: 420px; overflow-y: auto; border: 1px solid var(--gris);
+             border-radius: 10px; background: rgba(30,41,59,0.6);
+             display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+  #badge-contenedor::-webkit-scrollbar { width: 8px; }
+  #badge-contenedor::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+  #badge-contenedor::-webkit-scrollbar-thumb { background: var(--gris); border-radius: 4px; }
+  #badge-contenedor::-webkit-scrollbar-thumb:hover { background: var(--texto); }
+
+  /* ---------- tarjeta de badge compacta (del tamaño de un badge) ---------- */
+  .badge-card-compacta { background: var(--tarjeta); border-radius: 8px; padding: 10px;
+             margin: 0; border: 1px solid rgba(255,255,255,0.1);
+             display: flex; flex-direction: column; align-items: center; gap: 6px;
+             height: 150px; justify-content: flex-start; }
+  .badge-card-compacta .qr-placeholder { width: 70px; height: 70px; background: #000;
+             border-radius: 6px; margin: 4px auto 2px; display: flex;
+             align-items: center; justify-content: center; color: #666;
+             font-size: 0.5rem; border: 2px solid var(--primario-color); }
+  .badge-card-compacta h2 { margin: 0 0 2px; font-size: 0.95rem; }
+  .badge-card-compacta .sub { color: var(--gris); font-size: 0.65rem; margin-bottom: 2px; }
+  .badge-card-compacta .chip { display: inline-block; padding: 2px 8px; border-radius: 12px;
+             font-size: 0.65rem; font-weight: 700; margin: 2px 0; }
+  .chip-activo { background: var(--verde); color: #fff; }
+  .chip-bloqueado { background: var(--rojo); color: #fff; }
+  .badge-card-compacta .badge-meta { font-size: 0.6rem; color: var(--gris);
+             text-align: center; margin-top: 4px; }
+  .badge-card-compacta .epp-iconos { display: flex; gap: 5px; justify-content: center;
+             margin: 4px 0; flex-wrap: wrap; }
+  .badge-card-compacta .epp-icon { width: 34px; height: 34px; border-radius: 8px; display: flex;
+             flex-direction: column; align-items: center; justify-content: center;
+             font-size: 0.9rem; border: 2px solid; }
+  .badge-card-compacta .epp-icon .nombre { font-size: 0.5rem; margin-top: 2px; font-weight: 700;
+             text-transform: uppercase; letter-spacing: 0.03em; }
+  .badge-card-compacta .badge-actions { margin-top: 4px; display: flex; gap: 5px;
+             justify-content: center; }
+  .badge-card-compacta .boton { font-size: 0.65rem; padding: 3px 8px; }
+  .badge-card-compacta .resumen-badge { background: rgba(255,255,255,0.03); border-radius: 6px;
+             padding: 5px; margin-top: 4px; text-align: center; font-size: 0.6rem;
+             border: 1px solid rgba(255,255,255,0.08); }
+  .badge-card-compacta .resumen-badge .row { display: flex; justify-content: space-between;
+             margin-bottom: 1px; }
+  .badge-card-compacta .resumen-badge .label { color: var(--gris); }
+  .badge-card-compacta .resumen-badge .valor { font-weight: 700; }
+  .badge-card-compacta .temporizador { margin-top: 3px; padding: 3px 6px;
+             background: rgba(30,58,138,0.15); border-radius: 4px;
+             border: 1px solid rgba(30,58,138,0.3); }
+  .badge-card-compacta .temporizador .label-temp { font-size: 0.55rem; color: var(--gris);
+             margin-right: 4px; }
+  .badge-card-compacta .temporizador .valor-temp { font-size: 0.65rem; font-weight: 700;
+             color: var(--texto); font-family: monospace; }
   .tarjetas { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
               gap:8px; margin-top:12px; }
   .tarjeta { background:var(--tarjeta); border-radius:10px; padding:10px;
@@ -206,13 +257,13 @@ PAGINA = """<!DOCTYPE html>
   </div>
 
   <div class="derecha">
-    <!-- ---------- contenedor de múltiples cards de badge (arriba) ---------- -->
+    <!-- ---------- contenedor scrollable de badges (independiente) ---------- -->
     <div id="badge-contenedor">
       <div class="badge-none" id="badge-none">
         ⏳ Esperando badge QR frente a la cámara…
       </div>
       <div id="badge-cards" style="display:none;">
-        <!-- Aquí se insertan dinámicamente las cards de cada badge detectado -->
+        <!-- Aquí se insertan las 30 cards compactas de cada empleado -->
       </div>
     </div>
 
@@ -279,7 +330,7 @@ async function refrescarBadge() {
     }
 
     none.style.display = 'none';
-    contenedor.style.display = 'grid';
+    contenedor.style.display = 'flex';
 
     // Construir HTML de TODAS las cards (30 empleados siempre visibles)
     let html = '';
@@ -293,7 +344,6 @@ async function refrescarBadge() {
       const dentro = b.dentro === true;
 
       // Estado Adentro/Afuera
-      const estadoClase = dentro ? 'estado-adentro' : 'estado-afuera';
       const estadoTexto = dentro ? 'ADENTRO' : 'AFUERA';
 
       // Temporizador: si está adentro, mostrar tiempo transcurrido
@@ -312,7 +362,6 @@ async function refrescarBadge() {
       let eppHtml = '';
       Object.entries(mapeoEPP).forEach(([clave]) => {
         const val = epp[clave];
-        // Si no detectado recientemente, todo gris
         const estadoCls = detectado
           ? (val === true ? 'tiene' : (val === false ? 'falta' : 'sin-detectar'))
           : 'sin-detectar';
@@ -334,7 +383,7 @@ async function refrescarBadge() {
       }
 
       html += `
-        <div class="badge-card-multiple">
+        <div class="badge-card-compacta">
           <div class="qr-placeholder">QR</div>
           <h2>${b.nombre || '—'}</h2>
           <div class="sub">${b.puesto || '—'}</div>
@@ -345,7 +394,7 @@ async function refrescarBadge() {
             <div>Turno: ${b.turno || '—'}</div>
           </div>
           <div class="badge-actions">
-            <button class="boton primario btn-entrada" data-badge="${b.badge_id}">✅ Entrada</button>
+            <button class="boton btn-entrada" data-badge="${b.badge_id}">✅ Entrada</button>
             <button class="boton btn-salida" data-badge="${b.badge_id}">🚪 Salida</button>
           </div>
           ${resumenHtml}
@@ -378,10 +427,10 @@ async function refrescarBadge() {
             if (e) e.textContent = s.dentro ? 'ADENTRO' : 'AFUERA';
             if (t && s.dentro && s.horas_dentro_ahora !== null) {
               const totalSegundos = Math.floor(s.horas_dentro_ahora * 3600);
-              const h = Math.floor(totalSegundos / 3600);
-              const m = Math.floor((totalSegundos % 3600) / 60);
-              const s2 = totalSegundos % 60;
-              t.textContent = `${h}:${m.toString().padStart(2,'0')}:${s2.toString().padStart(2,'0')}`;
+              const hh = Math.floor(totalSegundos / 3600);
+              const mm = Math.floor((totalSegundos % 3600) / 60);
+              const ss = totalSegundos % 60;
+              t.textContent = `${hh}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')}`;
             }
           }
         } catch (err) { /* resumen opcional */ }
