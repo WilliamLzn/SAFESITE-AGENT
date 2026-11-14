@@ -64,13 +64,13 @@ class LectorBadgeQR:
     para no bloquear el loop principal de video."""
 
     def __init__(self, cooldown_segundos=0.5, cooldown_fallido=0.2,
-                 detectar_cada_n_frames=2, cola_max_tamaño=10):
+                 detectar_cada_n_frames=1, cola_max_tamaño=10):
         """
         cooldown_segundos: tiempo mínimo entre lecturas exitosas del mismo
                            badge (evita re-leer constantemente).
         cooldown_fallido: tiempo mínimo entre intentos de lectura fallida
                           del mismo badge (evita saturar la CPU).
-        detectar_cada_n_frames: ejecutar detección QR cada N frames (ahorra CPU).
+        detectar_cada_n_frames: ejecutar detección QR cada N frames (1 = cada frame).
         cola_max_tamaño: máximo de frames en la cola del hilo de detección.
         """
         self.detector = cv2.QRCodeDetector()
@@ -221,44 +221,21 @@ class LectorBadgeQR:
 
         gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # CLAHE para contraste adaptativo
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        # CLAHE para contraste adaptativo (mejor para iluminación desigual)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         gris_clahe = clahe.apply(gris)
 
-        # Umbral adaptativo (mejor para iluminación desigual)
-        _, umbral = cv2.threshold(
-            gris_clahe, 0, 255,
-            cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        # Umbral binario simple (mejor para QRs de alto contraste)
+        _, umbral = cv2.threshold(gris, 127, 255, cv2.THRESH_BINARY)
 
-        # Umbral inverso (para QRs oscuros sobre fondo claro)
-        _, umbral_inv = cv2.threshold(
-            gris_clahe, 0, 255,
-            cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        versiones.extend([gris, gris_clahe, umbral])
 
-        # Desenfoque suave para reducir ruido
-        suave = cv2.GaussianBlur(gris_clahe, (3, 3), 0)
-
-        # Nitidez (emphasize edges)
-        kernel_sharpen = np.array([[-1, -1, -1],
-                                   [-1,  9, -1],
-                                   [-1, -1, -1]])
-        sharpened = cv2.filter2D(gris_clahe, -1, kernel_sharpen)
-
-        versiones.extend([gris, gris_clahe, umbral, umbral_inv, suave, sharpened])
-
-        # Rotaciones para detectar QRs girados
+        # Rotación 180 para QRs volteados
         h, w = gris.shape
         centro = (w / 2, h / 2)
-        for angulo in (90, 180, 270):
-            M = cv2.getRotationMatrix2D(centro, angulo, 1.0)
-            rotada = cv2.warpAffine(gris, M, (w, h))
-            versiones.append(rotada)
-
-        # Versión reducida para QRs lejanos
-        reducido = cv2.resize(
-            gris, (max(1, w // 2), max(1, h // 2)),
-            interpolation=cv2.INTER_LINEAR)
-        versiones.append(reducido)
+        M = cv2.getRotationMatrix2D(centro, 180, 1.0)
+        rotada = cv2.warpAffine(gris, M, (w, h))
+        versiones.append(rotada)
 
         return versiones
 

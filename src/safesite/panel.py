@@ -645,8 +645,8 @@ class PanelSafeSite:
         cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         if not cam.isOpened():
             raise RuntimeError("no se pudo abrir la webcam (¿la usa otra app?)")
-        cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         print(f"🎥 webcam abierta ({int(cam.get(3))}x{int(cam.get(4))})", flush=True)
         while True:
             ok, frame = cam.read()
