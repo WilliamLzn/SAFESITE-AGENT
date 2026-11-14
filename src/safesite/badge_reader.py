@@ -133,6 +133,7 @@ class LectorBadgeQR:
     def _bucle_deteccion(self):
         """Bucle principal del hilo: procesa frames de la cola y detecta QRs."""
         contador_local = 0
+        frames_sin_qr = 0
         while not self._detener:
             # Obtener un frame de la cola
             frame = None
@@ -162,11 +163,14 @@ class LectorBadgeQR:
                 datos_lista = data if isinstance(data, list) else [data]
                 puntos_lista = puntos if puntos is not None else []
 
+                print(f"🔍 QR detectado! Contenido: {datos_lista}", flush=True)
+
                 for i, contenido in enumerate(datos_lista):
                     if not contenido:
                         continue
                     badge = self._parsear_qr(contenido, ahora)
                     if not badge.valido:
+                        print(f"⚠️ QR inválido: {contenido}", flush=True)
                         continue
 
                     caja = self._extraer_caja(
@@ -207,10 +211,18 @@ class LectorBadgeQR:
                         if len(self._ultimas_lecturas) > 50:
                             self._ultimas_lecturas = self._ultimas_lecturas[-50:]
 
+                    print(f"✅ Badge leído: {badge.badge_id} ({badge.nombre})", flush=True)
                     lecturas_encontradas = True
 
                 if lecturas_encontradas:
                     break
+
+            if not lecturas_encontradas:
+                frames_sin_qr += 1
+                if frames_sin_qr % 100 == 0:
+                    print(f"⏳ Esperando QR... ({frames_sin_qr} frames sin detectar)", flush=True)
+            else:
+                frames_sin_qr = 0
 
     # ------------------------------------------------------------------ preprocesamiento
 
