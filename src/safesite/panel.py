@@ -36,70 +36,81 @@ from .asistencia import registro_asistencia
 
 PAGINA = """<!DOCTYPE html>
 <html lang="es"><head>
-<meta charset="utf-8"><title>SafeSite-Agent · Panel en vivo</title>
+<meta charset="utf-8"><title>SafeSite-Agent · Supervisión en vivo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { --fondo:#0f172a; --tarjeta:#1e293b; --texto:#e2e8f0; --verde:#22c55e;
-          --rojo:#ef4444; --gris:#64748b; }
-  body { background:var(--fondo); color:var(--texto); font-family:system-ui,
-         sans-serif; margin:0; padding:20px; }
-  h1 { font-size:1.4rem; margin:0 0 4px; }
-  .sub { color:var(--gris); font-size:.85rem; margin-bottom:16px; }
-  .layout { display:grid; grid-template-columns:42% 58%; gap:16px;
-            grid-template-rows: auto; }
+  :root { --fondo:#0f172a; --tarjeta:#1e293b; --texto:#f8fafc; --verde:#10b981;
+          --rojo:#ef4444; --azul:#3b82f6; --gris:#64748b; --sombra:0 4px 6px -1px rgba(0,0,0,0.1);
+          --sombra-lg:0 10px 15px -3px rgba(0,0,0,0.1); }
+  body { background:var(--fondo); color:var(--texto); font-family:'Inter',system-ui,
+         sans-serif; margin:0; padding:0; }
+  h1 { font-size:1.5rem; margin:0 0 2px; font-weight:700; letter-spacing:-0.02em; }
+  .sub { color:var(--gris); font-size:.85rem; margin-bottom:16px; font-weight:400; }
+  .header { display:flex; align-items:center; gap:12px; margin-bottom:20px; padding:0 20px; }
+  .layout { display:grid; grid-template-columns:45% 55%; gap:20px;
+            grid-template-rows: auto; padding:0 20px 20px; }
   @media (max-width:900px){ .layout{grid-template-columns:1fr;} }
-  .video { width:100%; max-width:640px; border-radius:10px; background:#000;
-           aspect-ratio:4/3; object-fit:contain; display:block; margin:0 auto; }
+  .video-container { position:relative; width:100%; max-width:640px; border-radius:16px;
+             background:#000; aspect-ratio:16/9; object-fit:contain; margin:0 auto;
+             box-shadow:var(--sombra-lg); border:1px solid rgba(255,255,255,0.08); }
+  .video { width:100%; height:100%; border-radius:16px; object-fit:cover; }
+  .video-overlay { position:absolute; top:12px; left:12px; right:12px; bottom:12px;
+             border:2px solid rgba(255,255,255,0.1); border-radius:16px;
+             pointer-events:none; }
 
-  /* ---------- contenedor scrollable de badges (independiente del resto) ---------- */
-  #badge-contenedor { height: 420px; overflow-y: auto; border: 1px solid var(--gris);
-             border-radius: 10px; background: rgba(30,41,59,0.6);
-             display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px;
-             width: 100%; }
-  #badge-contenedor::-webkit-scrollbar { width: 8px; }
-  #badge-contenedor::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+  /* ---------- contenedor scrollable de badges (Material Design) ---------- */
+  #badge-contenedor { height: 520px; overflow-y: auto; border-radius: 16px;
+             background: rgba(30,41,59,0.4); display: grid;
+             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; padding: 20px;
+             width: 100%; border: 1px solid rgba(255,255,255,0.06);
+             box-shadow: var(--sombra); }
+  #badge-contenedor::-webkit-scrollbar { width: 6px; }
+  #badge-contenedor::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
   #badge-contenedor::-webkit-scrollbar-thumb { background: var(--gris); border-radius: 4px; }
-  #badge-contenedor::-webkit-scrollbar-thumb:hover { background: var(--texto); }
 
-  /* ---------- tarjeta de badge compacta (del tamaño de un badge) ---------- */
-  .badge-card-compacta { background: var(--tarjeta); border-radius: 8px; padding: 10px;
-             margin: 0; border: 1px solid rgba(255,255,255,0.1);
-             display: flex; flex-direction: column; align-items: center; gap: 6px;
-             height: 150px; justify-content: flex-start; width: 100%; }
+  /* ---------- tarjeta de badge Material Design ---------- */
+  .badge-card-compacta { background: var(--tarjeta); border-radius: 12px; padding: 16px;
+             margin: 0; border: 1px solid rgba(255,255,255,0.08);
+             display: flex; flex-direction: column; align-items: center; gap: 10px;
+             height: auto; min-height: 220px; width: 100%;
+             box-shadow: var(--sombra); transition: all 0.2s ease; }
+  .badge-card-compacta:hover { transform: translateY(-2px); box-shadow: var(--sombra-lg);
+             border-color: rgba(255,255,255,0.15); }
   .badge-card-compacta .qr-placeholder { width: 70px; height: 70px; background: #000;
-             border-radius: 6px; margin: 4px auto 2px; display: flex;
+             border-radius: 10px; margin: 4px auto 2px; display: flex;
              align-items: center; justify-content: center; color: #666;
-             font-size: 0.5rem; border: 2px solid var(--primario-color); }
-  .badge-card-compacta h2 { margin: 0 0 2px; font-size: 0.95rem; }
-  .badge-card-compacta .sub { color: var(--gris); font-size: 0.65rem; margin-bottom: 2px; }
-  .badge-card-compacta .chip { display: inline-block; padding: 2px 8px; border-radius: 12px;
-             font-size: 0.65rem; font-weight: 700; margin: 2px 0; }
+             font-size: 0.5rem; border: 2px solid var(--azul); }
+  .badge-card-compacta h2 { margin: 0 0 2px; font-size: 1rem; font-weight: 600; }
+  .badge-card-compacta .sub { color: var(--gris); font-size: 0.7rem; margin-bottom: 2px; }
+  .badge-card-compacta .chip { display: inline-block; padding: 4px 10px; border-radius: 20px;
+             font-size: 0.65rem; font-weight: 600; margin: 2px 0; }
   .chip-activo { background: var(--verde); color: #fff; }
   .chip-bloqueado { background: var(--rojo); color: #fff; }
-  .badge-card-compacta .badge-meta { font-size: 0.6rem; color: var(--gris);
-             text-align: center; margin-top: 4px; }
-  .badge-card-compacta .epp-iconos { display: flex; gap: 5px; justify-content: center;
-             margin: 4px 0; flex-wrap: wrap; }
-  .badge-card-compacta .epp-icon { width: 34px; height: 34px; border-radius: 8px; display: flex;
+  .badge-card-compacta .badge-meta { font-size: 0.65rem; color: var(--gris);
+             text-align: center; margin-top: 4px; width: 100%; }
+  .badge-card-compacta .epp-iconos { display: flex; gap: 6px; justify-content: center;
+             margin: 6px 0; flex-wrap: wrap; }
+  .badge-card-compacta .epp-icon { width: 40px; height: 40px; border-radius: 10px; display: flex;
              flex-direction: column; align-items: center; justify-content: center;
-             font-size: 0.9rem; border: 2px solid; }
-  .badge-card-compacta .epp-icon .nombre { font-size: 0.5rem; margin-top: 2px; font-weight: 700;
-             text-transform: uppercase; letter-spacing: 0.03em; }
-  .badge-card-compacta .badge-actions { margin-top: 4px; display: flex; gap: 5px;
-             justify-content: center; }
-  .badge-card-compacta .boton { font-size: 0.65rem; padding: 3px 8px; }
-  .badge-card-compacta .resumen-badge { background: rgba(255,255,255,0.03); border-radius: 6px;
-             padding: 5px; margin-top: 4px; text-align: center; font-size: 0.6rem;
-             border: 1px solid rgba(255,255,255,0.08); }
+             font-size: 1rem; border: 2px solid; }
+  .badge-card-compacta .epp-icon .nombre { font-size: 0.55rem; margin-top: 2px; font-weight: 600;
+             text-transform: uppercase; letter-spacing: 0.02em; }
+  .badge-card-compacta .badge-actions { margin-top: 4px; display: flex; gap: 6px;
+             justify-content: center; width: 100%; }
+  .badge-card-compacta .boton { font-size: 0.65rem; padding: 4px 10px; flex:1; }
+  .badge-card-compacta .resumen-badge { background: rgba(255,255,255,0.04); border-radius: 8px;
+             padding: 8px; margin-top: 6px; text-align: center; font-size: 0.65rem;
+             border: 1px solid rgba(255,255,255,0.06); width: 100%; }
   .badge-card-compacta .resumen-badge .row { display: flex; justify-content: space-between;
-             margin-bottom: 1px; }
+             margin-bottom: 2px; }
   .badge-card-compacta .resumen-badge .label { color: var(--gris); }
-  .badge-card-compacta .resumen-badge .valor { font-weight: 700; }
-  .badge-card-compacta .temporizador { margin-top: 3px; padding: 3px 6px;
-             background: rgba(30,58,138,0.15); border-radius: 4px;
-             border: 1px solid rgba(30,58,138,0.3); }
-  .badge-card-compacta .temporizador .label-temp { font-size: 0.55rem; color: var(--gris);
+  .badge-card-compacta .resumen-badge .valor { font-weight: 600; }
+  .badge-card-compacta .temporizador { margin-top: 4px; padding: 4px 8px;
+             background: rgba(30,58,138,0.15); border-radius: 6px;
+             border: 1px solid rgba(30,58,138,0.3); width: 100%; }
+  .badge-card-compacta .temporizador .label-temp { font-size: 0.6rem; color: var(--gris);
              margin-right: 4px; }
-  .badge-card-compacta .temporizador .valor-temp { font-size: 0.65rem; font-weight: 700;
+  .badge-card-compacta .temporizador .valor-temp { font-size: 0.7rem; font-weight: 700;
              color: var(--texto); font-family: monospace; }
   .tarjetas { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
               gap:8px; margin-top:12px; }
@@ -257,13 +268,13 @@ PAGINA = """<!DOCTYPE html>
   </div>
 
   <div class="derecha">
-    <!-- ---------- contenedor scrollable de badges (independiente) ---------- -->
+    <!-- ---------- contenedor scrollable de badges (Material Design) ---------- -->
     <div id="badge-contenedor">
-      <div class="badge-none" id="badge-none">
+      <div class="badge-none" id="badge-none" style="text-align:center; padding:40px 20px; color:var(--gris); font-style:italic;">
         ⏳ Esperando badge QR frente a la cámara…
       </div>
       <div id="badge-cards" style="display:none;">
-        <!-- Aquí se insertan las 30 cards compactas de cada empleado -->
+        <!-- Aquí se insertan las cards de badges detectados dinámicamente -->
       </div>
     </div>
 
@@ -857,26 +868,17 @@ class PanelSafeSite:
             conteos = dict(getattr(self, "_conteos", {}))
             faltas = [{"clase": d.nombre, "conf": round(d.conf, 2)}
                       for d in getattr(self, "_faltas", [])]
-            # Obtener TODOS los empleados de la nómina (30 cards siempre visibles)
-            badges_lista = registro_asistencia.listar_todos()
-        # Alertas de jornada sin salida (fuera del lock para no bloquear)
-        alertas_jornada = registro_asistencia.obtener_jornadas_sin_salida()
-        # Marcar qué badges fueron detectados recientemente (para activar EPP)
-        badges_detectados_ids = set()
-        with self.lock:
+            # Solo badges detectados (cards dinámicas - aparecen al escanear QR)
+            badges_lista = []
             for bid, d in self.badges_activos.items():
-                badges_detectados_ids.add(bid)
-        ahora_ts = time.time()
-        for b in badges_lista:
-            bid = b.get("badge_id", "")
-            # Si fue detectado recientemente, marcar para activar EPP después de 1s
-            if bid in badges_detectados_ids:
-                ultimo = self.badges_activos.get(bid, {}).get("ultima_deteccion", 0)
-                b["detectado_recientemente"] = (ahora_ts - ultimo) < 2.0
-                b["tiempo_deteccion"] = ultimo
-            else:
-                b["detectado_recientemente"] = False
-                b["tiempo_deteccion"] = 0
+                datos = d["datos"].copy()
+                ahora_ts = time.time()
+                # EPP activo solo por 8 segundos después de detectar el badge
+                datos["detectado_recientemente"] = (ahora_ts - d["ultima_deteccion"]) < 8.0
+                datos["tiempo_deteccion"] = d["ultima_deteccion"]
+                badges_lista.append(datos)
+        # Alertas de jornada sin salida
+        alertas_jornada = registro_asistencia.obtener_jornadas_sin_salida()
         return {
             "zona": self.zona,
             "perfil": self.perfil,
@@ -891,31 +893,21 @@ class PanelSafeSite:
                               if self.whatsapp_real else "DESHABILITADO"),
             "faltas_actuales": faltas,
             "badges": badges_lista,
-            "badge": badges_lista[0] if badges_lista else None,  # compatibilidad
+            "badge": badges_lista[0] if badges_lista else None,
             "alertas_jornada": alertas_jornada,
         }
 
     # ---------- endpoints de badges v2 ----------
     def badge_estado(self):
-        """Devuelve TODOS los empleados de la nómina (30 cards siempre visibles).
-        Cada card muestra estado ADENTRO/AFUERA con su temporizador y EPP."""
-        # Obtener todos los empleados (como hace estado())
-        badges_lista = registro_asistencia.listar_todos()
-        # Marcar qué badges fueron detectados recientemente (para activar EPP)
-        badges_detectados_ids = set()
-        with self.lock:
-            for bid, d in self.badges_activos.items():
-                badges_detectados_ids.add(bid)
-        ahora_ts = time.time()
-        for b in badges_lista:
-            bid = b.get("badge_id", "")
-            if bid in badges_detectados_ids:
-                ultimo = self.badges_activos.get(bid, {}).get("ultima_deteccion", 0)
-                b["detectado_recientemente"] = (ahora_ts - ultimo) < 2.0
-                b["tiempo_deteccion"] = ultimo
-            else:
-                b["detectado_recientemente"] = False
-                b["tiempo_deteccion"] = 0
+        """Devuelve solo badges detectados recientemente (cards dinámicas).
+        Aparecen al escanear QR, desaparecen al marcar salida."""
+        badges_lista = []
+        for bid, d in self.badges_activos.items():
+            datos = d["datos"].copy()
+            ahora_ts = time.time()
+            datos["detectado_recientemente"] = (ahora_ts - d["ultima_deteccion"]) < 8.0
+            datos["tiempo_deteccion"] = d["ultima_deteccion"]
+            badges_lista.append(datos)
         return badges_lista
 
     def badge_jornada_alertas(self):

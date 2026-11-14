@@ -63,8 +63,8 @@ class LectorBadgeQR:
     estrategias de preprocesamiento, ejecutado en un hilo separado
     para no bloquear el loop principal de video."""
 
-    def __init__(self, cooldown_segundos=2.0, cooldown_fallido=0.5,
-                 detectar_cada_n_frames=10, cola_max_tamaño=5):
+    def __init__(self, cooldown_segundos=0.5, cooldown_fallido=0.2,
+                 detectar_cada_n_frames=2, cola_max_tamaño=10):
         """
         cooldown_segundos: tiempo mínimo entre lecturas exitosas del mismo
                            badge (evita re-leer constantemente).
@@ -221,26 +221,40 @@ class LectorBadgeQR:
 
         gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        # CLAHE para contraste adaptativo
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
         gris_clahe = clahe.apply(gris)
 
+        # Umbral adaptativo (mejor para iluminación desigual)
         _, umbral = cv2.threshold(
             gris_clahe, 0, 255,
             cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
+        # Umbral inverso (para QRs oscuros sobre fondo claro)
+        _, umbral_inv = cv2.threshold(
+            gris_clahe, 0, 255,
+            cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+        # Desenfoque suave para reducir ruido
         suave = cv2.GaussianBlur(gris_clahe, (3, 3), 0)
 
-        versiones.extend([gris, gris_clahe, umbral, suave])
+        # Nitidez (emphasize edges)
+        kernel_sharpen = np.array([[-1, -1, -1],
+                                   [-1,  9, -1],
+                                   [-1, -1, -1]])
+        sharpened = cv2.filter2D(gris_clahe, -1, kernel_sharpen)
 
-        # Rotaciones para detectar QRs girados (solo 0 y 180 para ahorrar CPU)
+        versiones.extend([gris, gris_clahe, umbral, umbral_inv, suave, sharpened])
+
+        # Rotaciones para detectar QRs girados
         h, w = gris.shape
         centro = (w / 2, h / 2)
-        for angulo in (180,):
+        for angulo in (90, 180, 270):
             M = cv2.getRotationMatrix2D(centro, angulo, 1.0)
             rotada = cv2.warpAffine(gris, M, (w, h))
             versiones.append(rotada)
 
-        # Versión reducida para QRs lejanos (ahorra CPU)
+        # Versión reducida para QRs lejanos
         reducido = cv2.resize(
             gris, (max(1, w // 2), max(1, h // 2)),
             interpolation=cv2.INTER_LINEAR)
