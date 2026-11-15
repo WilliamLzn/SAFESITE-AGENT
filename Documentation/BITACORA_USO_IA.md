@@ -10,5 +10,4 @@
 | Fix deadlock en marcar_entrada/marcar_salida (lock reentrante) | Identificó la causa raíz (Lock de Python no es reentrante) y propuso la solución (acceso directo al estado sin llamar a esta_dentro()) | Validamos que el hilo ya no se muere |
 | Fix endpoint /badge/estado para siempre devolver JSON válido | Propuso el try/except que devuelve [] ante cualquier error | Verificamos que el navegador ya no lanza Uncaught SyntaxError |
 | Reducción de logs del bucle de captura | Propuso eliminar logs repetitivos por frame y dejar solo cambios de estado | Validamos que la consola sea legible |
-| Commit al repositorio (960079f + 8eea98f) | Ejecutó los comandos de git add/commit | Revisamos los archivos incluidos y autorizamos el push |
 
