@@ -39,106 +39,83 @@ PAGINA = """<!DOCTYPE html>
 <meta charset="utf-8"><title>SafeSite-Agent · Supervisión en vivo</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { --fondo:#0f172a; --tarjeta:#1e293b; --texto:#f8fafc; --verde:#10b981;
-          --rojo:#ef4444; --azul:#3b82f6; --gris:#64748b; --sombra:0 4px 6px -1px rgba(0,0,0,0.1);
-          --sombra-lg:0 10px 15px -3px rgba(0,0,0,0.1); }
-  body { background:var(--fondo); color:var(--texto); font-family:'Inter',system-ui,
-         sans-serif; margin:0; padding:0; }
-  h1 { font-size:1.5rem; margin:0 0 2px; font-weight:700; letter-spacing:-0.02em; }
-  .sub { color:var(--gris); font-size:.85rem; margin-bottom:16px; font-weight:400; }
-  .header { display:flex; align-items:center; gap:12px; margin-bottom:20px; padding:0 20px; }
-  .layout { display:grid; grid-template-columns:45% 55%; gap:20px;
-            grid-template-rows: auto; padding:0 20px 20px; }
+  :root {
+    --fondo:#05050a;
+    --tarjeta: rgba(20, 18, 32, 0.7);
+    --borde: rgba(139, 92, 246, 0.3);
+    --borde-suave: rgba(255,255,255,0.08);
+    --texto:#f8fafc;
+    --texto-sec:#94a3b8;
+    --acento:#8b5cf6;
+    --acento-2:#d946ef;
+    --acento-3:#06b6d4;
+    --ok:#10b981;
+    --alerta:#ef4444;
+    --sombra-color: 0 20px 40px -10px rgba(139, 92, 246, 0.25);
+    --borde-qr: rgba(139,92,246,0.6);
+  }
+  * { box-sizing: border-box; }
+  body { background:#05050a; color:var(--texto); font-family:'Inter',system-ui,sans-serif; margin:0; padding:0; min-height:100vh; }
+  .wrap { max-width:1400px; margin:0 auto; width:100%; }
+  h1 { font-size:1.15rem; margin:0 0 2px; font-weight:700; letter-spacing:-0.01em; display:flex; align-items:center; gap:8px; }
+  .sub { color:var(--texto-sec); font-size:.8rem; margin-bottom:14px; font-weight:400; }
+  .header { display:flex; align-items:center; gap:10px; margin-bottom:16px; padding:0 20px; }
+  .layout { display:grid; grid-template-columns:60% 40%; gap:16px; grid-template-rows:auto; padding:0 24px 28px; }
   @media (max-width:900px){ .layout{grid-template-columns:1fr;} }
-  .video-container { position:relative; width:100%; max-width:640px; border-radius:16px;
-             background:#000; aspect-ratio:16/9; object-fit:contain; margin:0 auto;
-             box-shadow:var(--sombra-lg); border:1px solid rgba(255,255,255,0.08); }
-  .video { width:100%; height:100%; border-radius:16px; object-fit:cover; }
-  .video-overlay { position:absolute; top:12px; left:12px; right:12px; bottom:12px;
-             border:2px solid rgba(255,255,255,0.1); border-radius:16px;
-             pointer-events:none; }
+  .video-container { position:relative; width:100%; max-width:760px; border-radius:24px; background:#000; aspect-ratio:16/9; object-fit:cover; margin:0 auto; border:1px solid var(--borde-suave); box-shadow:var(--sombra-color); overflow:hidden; }
+  .video { width:100%; height:100%; border-radius:24px; object-fit:cover; display:block; }
+  .estado-camara-overlay { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); z-index:50; background:rgba(10,8,18,0.75); backdrop-filter:blur(12px); color:var(--texto); padding:8px 18px; border-radius:30px; border:1px solid var(--borde); font-size:.82rem; font-weight:700; pointer-events:none; max-width:90%; text-align:center; box-shadow:0 12px 32px -6px rgba(0,0,0,0.5); }
 
-  /* ---------- contenedor scrollable de badges (Material Design) ---------- */
-  #badge-contenedor { height: 520px; overflow-y: auto; border-radius: 16px;
-             background: rgba(30,41,59,0.4); display: grid;
-             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; padding: 20px;
-             width: 100%; border: 1px solid rgba(255,255,255,0.06);
-             box-shadow: var(--sombra); }
-  #badge-contenedor::-webkit-scrollbar { width: 6px; }
-  #badge-contenedor::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
-  #badge-contenedor::-webkit-scrollbar-thumb { background: var(--gris); border-radius: 4px; }
+  /* ---------- contenedor scrollable de badges ---------- */
+  #badge-contenedor { overflow-y:auto; border-radius:20px; display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:14px; padding:18px; border:1px solid var(--borde-suave); box-shadow:var(--sombra-color); }
+  #badge-contenedor::-webkit-scrollbar { width: 5px; }
+  #badge-contenedor::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+  #badge-contenedor::-webkit-scrollbar-thumb { background: var(--borde-suave); border-radius: 3px; }
 
-  /* ---------- tarjeta de badge Material Design ---------- */
-  .badge-card-compacta { background: var(--tarjeta); border-radius: 12px; padding: 16px;
-             margin: 0; border: 1px solid rgba(255,255,255,0.08);
-             display: flex; flex-direction: column; align-items: center; gap: 10px;
-             height: auto; min-height: 220px; width: 100%;
-             box-shadow: var(--sombra); transition: all 0.2s ease; }
-  .badge-card-compacta:hover { transform: translateY(-2px); box-shadow: var(--sombra-lg);
-             border-color: rgba(255,255,255,0.15); }
-  .badge-card-compacta .qr-placeholder { width: 70px; height: 70px; background: #000;
-             border-radius: 10px; margin: 4px auto 2px; display: flex;
-             align-items: center; justify-content: center; color: #666;
-             font-size: 0.5rem; border: 2px solid var(--azul); }
-  .badge-card-compacta h2 { margin: 0 0 2px; font-size: 1rem; font-weight: 600; }
-  .badge-card-compacta .sub { color: var(--gris); font-size: 0.7rem; margin-bottom: 2px; }
-  .badge-card-compacta .chip { display: inline-block; padding: 4px 10px; border-radius: 20px;
-             font-size: 0.65rem; font-weight: 600; margin: 2px 0; }
-  .chip-activo { background: var(--verde); color: #fff; }
-  .chip-bloqueado { background: var(--rojo); color: #fff; }
-  .badge-card-compacta .badge-meta { font-size: 0.65rem; color: var(--gris);
-             text-align: center; margin-top: 4px; width: 100%; }
-  .badge-card-compacta .epp-iconos { display: flex; gap: 6px; justify-content: center;
-             margin: 6px 0; flex-wrap: wrap; }
-  .badge-card-compacta .epp-icon { width: 40px; height: 40px; border-radius: 10px; display: flex;
-             flex-direction: column; align-items: center; justify-content: center;
-             font-size: 1rem; border: 2px solid; }
-  .badge-card-compacta .epp-icon .nombre { font-size: 0.55rem; margin-top: 2px; font-weight: 600;
-             text-transform: uppercase; letter-spacing: 0.02em; }
-  .badge-card-compacta .badge-actions { margin-top: 4px; display: flex; gap: 6px;
-             justify-content: center; width: 100%; }
-  .badge-card-compacta .boton { font-size: 0.65rem; padding: 4px 10px; flex:1; }
-  .badge-card-compacta .resumen-badge { background: rgba(255,255,255,0.04); border-radius: 8px;
-             padding: 8px; margin-top: 6px; text-align: center; font-size: 0.65rem;
-             border: 1px solid rgba(255,255,255,0.06); width: 100%; }
-  .badge-card-compacta .resumen-badge .row { display: flex; justify-content: space-between;
-             margin-bottom: 2px; }
-  .badge-card-compacta .resumen-badge .label { color: var(--gris); }
-  .badge-card-compacta .resumen-badge .valor { font-weight: 600; }
-  .badge-card-compacta .temporizador { margin-top: 4px; padding: 4px 8px;
-             background: rgba(30,58,138,0.15); border-radius: 6px;
-             border: 1px solid rgba(30,58,138,0.3); width: 100%; }
-  .badge-card-compacta .temporizador .label-temp { font-size: 0.6rem; color: var(--gris);
-             margin-right: 4px; }
-  .badge-card-compacta .temporizador .valor-temp { font-size: 0.7rem; font-weight: 700;
-             color: var(--texto); font-family: monospace; }
-  .tarjetas { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
-              gap:8px; margin-top:12px; }
-  .tarjeta { background:var(--tarjeta); border-radius:10px; padding:10px;
-             text-align:center; }
-  .tarjeta .num { font-size:1.6rem; font-weight:700; }
-  .tarjeta .etq { font-size:.7rem; color:var(--gris); text-transform:uppercase; }
-  .ok { color:var(--verde); } .falta { color:var(--rojo); }
-  .panel { background:var(--tarjeta); border-radius:10px; padding:14px; }
-  .panel h2 { font-size:.95rem; margin:0 0 10px; color:var(--gris);
-              text-transform:uppercase; }
-  #log { max-height:420px; overflow-y:auto; font-size:.8rem; }
-  .incidente { border-left:3px solid var(--rojo); padding:6px 10px;
-               margin-bottom:8px; background:#0f172a; border-radius:6px; }
-  .incidente .hora { color:var(--gris); font-size:.7rem; }
-  .vacio { color:var(--gris); font-style:italic; }
-  .estado-linea { font-size:.75rem; color:var(--gris); margin-top:10px; }
-  .punto { display:inline-block; width:9px; height:9px; border-radius:50%;
-           background:var(--verde); margin-right:6px; animation:pulso 1.5s infinite; }
-  @keyframes pulso { 50%{opacity:.3;} }
-  .controles { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
-  .boton { background:var(--tarjeta); color:var(--texto);
-           border:1px solid var(--gris); border-radius:8px; padding:8px 14px;
-           cursor:pointer; font-size:.85rem; transition:border-color .15s; }
-  .boton:hover { border-color:var(--verde); }
-  .boton:disabled { opacity:.5; cursor:wait; }
-  .boton.apagado { border-color:var(--rojo); color:var(--rojo); }
-  .faltas-badge { font-size:.75rem; color:var(--rojo); align-self:center; }
+  /* ---------- tarjeta de badge ---------- */
+  .badge-none { color:var(--texto-sec); font-style:italic; text-align:center; padding:50px 20px; }
+  .badge-card-compacta { background:var(--tarjeta); border-radius:18px; padding:16px; border:1px solid var(--borde-suave); display:flex; flex-direction:column; align-items:center; gap:10px; height:auto; min-height:260px; transition:all .25s ease; position:relative; overflow:hidden; }
+  .badge-card-compacta::before { content:""; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--acento), var(--acento-2)); opacity:0; transition:opacity .25s; }
+  .badge-card-compacta:hover { border-color:var(--acento); transform:translateY(-4px); box-shadow:0 12px 32px -6px rgba(139,92,246,0.35); }
+  .badge-card-compacta:hover::before { opacity:1; }
+  .badge-card-compacta .qr-placeholder { width:64px; height:64px; border-radius:14px; margin:2px auto 0; display:flex; align-items:center; justify-content:center; font-size:1.4rem; border:2px solid var(--borde-qr); background:rgba(0,0,0,0.4); }
+  .badge-card-compacta h2 { margin:0 0 2px; font-size:1rem; font-weight:700; letter-spacing:-0.01em; }
+  .badge-card-compacta .sub { color:var(--texto-sec); font-size:.72rem; margin-bottom:1px; }
+  .badge-card-compacta .chip { display:inline-block; padding:4px 12px; border-radius:24px; font-size:.72rem; font-weight:700; margin:2px 0; }
+  .chip-activo { background:var(--ok); color:#fff; box-shadow:0 4px 12px -4px rgba(16,185,129,0.4); }
+  .chip-bloqueado { background:var(--alerta); color:#fff; box-shadow:0 4px 12px -4px rgba(239,68,68,0.4); }
+  .badge-card-compacta .badge-meta { font-size:.7rem; color:var(--texto-sec); text-align:center; margin-top:2px; width:100%; line-height:1.4; }
+  .badge-card-compacta .epp-iconos { display:flex; gap:6px; justify-content:center; margin:6px 0; flex-wrap:wrap; }
+  .badge-card-compacta .epp-icon { width:42px; height:42px; border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:1.1rem; border:2px solid; }
+  .badge-card-compacta .epp-icon .nombre { font-size:.62rem; margin-top:2px; font-weight:700; letter-spacing:0.01em; text-transform:none; }
+  .badge-card-compacta .badge-actions { margin-top:4px; display:flex; gap:6px; justify-content:center; width:100%; }
+  .badge-card-compacta .boton { font-size:.72rem; padding:5px 10px; flex:1; }
+  .badge-card-compacta .resumen-badge { background:rgba(255,255,255,0.03); border-radius:12px; padding:8px; margin-top:4px; text-align:center; font-size:.72rem; border:1px solid var(--borde-suave); width:100%; }
+  .badge-card-compacta .resumen-badge .row { display:flex; justify-content:space-between; margin-bottom:1.5px; }
+  .badge-card-compacta .resumen-badge .label { color:var(--texto-sec); }
+  .badge-card-compacta .resumen-badge .valor { font-weight:700; color:var(--texto); }
+  .badge-card-compacta .temporizador { margin-top:3px; padding:4px 8px; background:rgba(139,92,246,0.1); border-radius:8px; border:1px solid rgba(139,92,246,0.25); width:100%; }
+  .badge-card-compacta .temporizador .label-temp { font-size:.66rem; color:var(--texto-sec); margin-right:3px; }
+  .badge-card-compacta .temporizador .valor-temp { font-size:.8rem; font-weight:700; color:var(--texto); font-family:'Inter',monospace; }
+  .tarjetas { display:grid; grid-template-columns:repeat(auto-fill,minmax(95px,1fr)); gap:8px; margin-top:12px; }
+  .tarjeta { background:var(--tarjeta); border-radius:12px; padding:10px; text-align:center; border:1px solid var(--borde-suave); }
+  .tarjeta .num { font-size:1.5rem; font-weight:700; }
+  .tarjeta .etq { font-size:.7rem; color:var(--texto-sec); text-transform:none; }
+  .ok { color:var(--ok); } .falta { color:var(--alerta); }
+  .panel { padding:18px; }
+  .panel h2 { font-size:.85rem; margin:0 0 12px; color:var(--texto-sec); font-weight:600; letter-spacing:0.02em; display:flex; align-items:center; gap:8px; }
+  #log { max-height:380px; overflow-y:auto; font-size:.82rem; }
+  .incidente { border-left:3px solid var(--alerta); padding:8px 12px; margin-bottom:8px; background:rgba(239,68,68,0.08); border-radius:8px; }
+  .incidente .hora { color:var(--texto-sec); font-size:.72rem; }
+  .vacio { color:var(--texto-sec); font-style:italic; }
+  .estado-linea { font-size:.74rem; color:var(--texto-sec); margin-top:10px; }
+  .punto { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--ok); margin-right:5px; }
+  .controles { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; padding:0 20px; }
+  .boton { background:var(--tarjeta); color:var(--texto); border:1px solid var(--borde-suave); border-radius:10px; padding:8px 14px; cursor:pointer; font-size:.82rem; transition:all .2s; }
+  .boton:hover { border-color:var(--acento); background:rgba(139,92,246,0.12); color:var(--texto); }
+  .boton:disabled { opacity:.55; cursor:wait; }
+  .boton.apagado { border-color:var(--alerta); color:var(--alerta); }
+  .faltas-badge { font-size:.78rem; color:var(--alerta); align-self:center; margin-left:auto; }
 
   /* ---------- tarjeta de badge v2 ---------- */
   .badge-card { background:var(--tarjeta); border-radius:14px; padding:18px;
@@ -217,40 +194,24 @@ PAGINA = """<!DOCTYPE html>
   .badge-card-multiple .resumen-badge .valor { font-weight:700; }
 
   /* ---------- alertas de jornada ---------- */
-  .alerta-jornada { border-left:4px solid var(--rojo); padding:8px 10px;
-            margin-bottom:6px; background:#fef2f2; border-radius:6px; }
-  .alerta-jornada .hora { color:var(--rojo); font-size:.7rem; font-weight:700; }
+  /* ---------- alertas de jornada ---------- */
+  .alerta-jornada { border-left:3px solid var(--alerta); padding:8px 12px; margin-bottom:8px; background:rgba(239,68,68,0.08); border-radius:8px; }
+  .alerta-jornada .hora { color:var(--alerta); font-size:.72rem; font-weight:700; }
   .alerta-jornada .nombre { font-weight:700; color:var(--texto); }
-  .alerta-jornada .detalle { font-size:.75rem; color:var(--gris); margin-top:4px; }
-  .btn-forzar { background:var(--rojo); border-color:var(--rojo); color:#fff;
-            font-size:.75rem; padding:4px 10px; border-radius:6px; cursor:pointer; }
-  .btn-forzar:hover { background:#b91c1c; }
+  .alerta-jornada .detalle { font-size:.76rem; color:var(--texto-sec); margin-top:4px; }
+  .btn-forzar { background:linear-gradient(135deg, var(--alerta), #b91c1c); border:none; color:#fff; font-size:.74rem; padding:5px 12px; border-radius:7px; cursor:pointer; }
+  .btn-forzar:hover { filter:brightness(1.1); }
 
-  /* ---------- estados Adentro/Afuera ---------- */
-  .estado-adentro { color:var(--verde); font-weight:700; }
-  .estado-afuera { color:var(--rojo); font-weight:700; }
+  /* ---------- estados ---------- */
+  .estado-adentro { color:var(--ok); font-weight:700; }
+  .estado-afuera { color:var(--alerta); font-weight:700; }
 
-  /* ---------- temporizador ---------- */
-  .temporizador { margin-top:6px; padding:4px 8px; background:rgba(30,58,138,0.15);
-            border-radius:6px; border:1px solid rgba(30,58,138,0.3); }
-  .temporizador .label-temp { font-size:.7rem; color:var(--gris); margin-right:6px; }
-  .temporizador .valor-temp { font-size:.85rem; font-weight:700; color:var(--texto); font-family:monospace; }
-  .badge-card .sub { color:var(--gris); font-size:.8rem; margin-bottom:8px; }
-  .badge-card .chip { display:inline-block; padding:4px 10px; border-radius:20px;
-                font-size:.8rem; font-weight:700; margin:4px 2px; }
-  .chip-activo { background:var(--verde); color:#fff; }
-  .chip-bloqueado { background:var(--rojo); color:#fff; }
-  .badge-actions { margin-top:10px; display:flex; gap:8px; justify-content:center;
-                flex-wrap:wrap; }
-  .badge-none { color:var(--gris); font-style:italic; text-align:center;
-                padding:30px 10px; flex:1; }
-  .resumen-badge { background:rgba(255,255,255,0.03); border-radius:8px;
-                padding:10px; margin-top:10px; text-align:left; font-size:.8rem;
-                border:1px solid rgba(255,255,255,0.08); }
-  .resumen-badge .row { display:flex; justify-content:space-between; margin-bottom:3px; }
-  .resumen-badge .label { color:var(--gris); }
-  .resumen-badge .valor { font-weight:700; }
-</style></head><body>
+  /* ---------- iconos EPP estados ---------- */
+  .epp-icon.tiene { border-color:var(--ok); background:rgba(16,185,129,0.14); color:var(--ok); }
+  .epp-icon.falta { border-color:var(--alerta); background:rgba(239,68,68,0.14); color:var(--alerta); }
+  .epp-icon.sin-detectar { border-color:var(--borde-suave); background:rgba(255,255,255,0.04); color:var(--texto-sec); }
+
+</style></head><body><div class="wrap">
 <h1>👷 SafeSite-Agent — Supervisión en vivo</h1>
 <div class="sub" id="sub">conectando con la cámara…</div>
 <div class="controles">
@@ -261,31 +222,29 @@ PAGINA = """<!DOCTYPE html>
 
 <div class="layout">
   <div class="izquierda">
-    <img class="video" src="/video" alt="video en vivo">
+    <div class="video-container">
+      <img class="video" src="/video" alt="video en vivo">
+      <div class="estado-camara-overlay" id="estado-camara">Reconociendo…</div>
+    </div>
     <div id="tarjetas-epp" style="display:none;">
       <div class="tarjetas" id="tarjetas"></div>
     </div>
   </div>
 
   <div class="derecha">
-    <!-- ---------- contenedor scrollable de badges (Material Design) ---------- -->
     <div id="badge-contenedor">
-      <div class="badge-none" id="badge-none" style="text-align:center; padding:40px 20px; color:var(--gris); font-style:italic;">
+      <div class="badge-none" id="badge-none">
         ⏳ Esperando badge QR frente a la cámara…
       </div>
-      <div id="badge-cards" style="display:none;">
-        <!-- Aquí se insertan las cards de badges detectados dinámicamente -->
-      </div>
+      <div id="badge-cards" style="display:none;"></div>
     </div>
 
-    <!-- ---------- incidentes confirmados (abajo) ---------- -->
     <div class="panel panel-incidentes">
       <h2>🚨 Incidentes confirmados</h2>
       <div id="log"><div class="vacio">sin incidentes todavía…</div></div>
       <div class="estado-linea" id="estado"></div>
     </div>
 
-    <!-- ---------- alertas de jornada sin salida ---------- -->
     <div class="panel panel-incidentes">
       <h2>⚠️ Alertas de jornada</h2>
       <div id="log-jornada"><div class="vacio">sin alertas de jornada…</div></div>
@@ -351,11 +310,21 @@ async function refrescarBadge() {
     const mapeoEPP = {casco:'epp-casco', gafas:'epp-gafas', guantes:'epp-guantes', botas:'epp-botas'};
     const iconosEPP = {casco:'🪖', gafas:'👓', guantes:'🧤', botas:'🥾'};
 
+    const emojiPorPuesto = {
+      supervisor_hse: '🦺',
+      albañil: '🧱',
+      electricista: '⚡',
+      ayudante: '🛠️',
+      operario_grua: '🏗️',
+      soldador: '🔥',
+    };
+
     for (const b of badges) {
       const activo = b.activo === true;
       const chipClass = activo ? 'chip-activo' : 'chip-bloqueado';
       const chipText = activo ? 'ACTIVO' : 'BLOQUEADO';
       const dentro = b.dentro === true;
+      const emoji = emojiPorPuesto[b.puesto] || '👷';
 
       // Estado Adentro/Afuera
       const estadoTexto = dentro ? 'ADENTRO' : 'AFUERA';
@@ -389,8 +358,9 @@ async function refrescarBadge() {
       if (b.existe !== false) {
         resumenHtml = `
           <div class="resumen-badge">
-            <div class="row"><span class="label">Horas:</span><span class="valor" id="horas-${b.badge_id}">${b.horas_hoy||0}</span> h</div>
-            <div class="row"><span class="label">Valor:</span><span class="valor" id="valor-${b.badge_id}">$${(b.valor_pagar||0).toLocaleString('es-CO')}</span></div>
+            <div class="row"><span class="label">Hoy:</span><span class="valor" id="horas-${b.badge_id}">${b.horas_hoy||0}</span> h</div>
+            <div class="row"><span class="label">Semana:</span><span class="valor" id="horas-semana-${b.badge_id}">${b.horas_semana||0}</span> h</div>
+            <div class="row"><span class="label">Valor semana:</span><span class="valor" id="valor-semana-${b.badge_id}">$${(b.valor_semana||0).toLocaleString('es-CO')}</span></div>
             <div class="row"><span class="label">Estado:</span><span class="valor estado-${dentro?'adentro':'afuera'}">${estadoTexto}</span></div>
             ${temporizadorHtml}
           </div>`;
@@ -398,7 +368,7 @@ async function refrescarBadge() {
 
       html += `
         <div class="badge-card-compacta">
-          <div class="qr-placeholder">QR</div>
+          <div class="qr-placeholder" style="font-size:1.5rem;">${emoji}</div>
           <h2>${b.nombre || '—'}</h2>
           <div class="sub">${b.puesto || '—'}</div>
           <span class="chip ${chipClass}">${chipText}</span>
@@ -434,10 +404,14 @@ async function refrescarBadge() {
           if (s.existe) {
             const h = document.getElementById(`horas-${b.badge_id}`);
             const v = document.getElementById(`valor-${b.badge_id}`);
+            const hs = document.getElementById(`horas-semana-${b.badge_id}`);
+            const vs = document.getElementById(`valor-semana-${b.badge_id}`);
             const e = document.getElementById(`estado-${b.badge_id}`);
             const t = document.getElementById(`temp-${b.badge_id}`);
             if (h) h.textContent = s.horas_hoy || 0;
             if (v) v.textContent = '$' + (s.valor_pagar || 0).toLocaleString('es-CO');
+            if (hs) hs.textContent = s.horas_semana || 0;
+            if (vs) vs.textContent = '$' + (s.valor_semana || 0).toLocaleString('es-CO');
             if (e) e.textContent = s.dentro ? 'ADENTRO' : 'AFUERA';
             if (t && s.dentro && s.horas_dentro_ahora !== null) {
               const totalSegundos = Math.floor(s.horas_dentro_ahora * 3600);
@@ -456,24 +430,6 @@ async function refrescarBadge() {
 
 async function marcarBadge(badgeId, accion) {
   if (!badgeId || badgeId === '—') return;
-  try {
-    const r = await fetch('/badge/marcar/' + encodeURIComponent(badgeId) + '/' + accion, {method:'POST'});
-    const e = await r.json();
-    if (e.ok) {
-      // Refrescar para mostrar el nuevo estado
-      setTimeout(() => { refrescarBadge(); }, 800);
-    } else {
-      console.warn('Error marcando badge:', e.motivo || 'error');
-    }
-  } catch (err) {
-    console.warn('Error de red marcando badge:', err);
-  }
-}
-
-async function marcarBadge(accion) {
-  const b = document.getElementById('badge-id');
-  const badgeId = b.textContent;
-  if (!badgeId || badgeId === '—') return;
   const btn = event.target;
   btn.disabled = true; btn.textContent = '⏳…';
   try {
@@ -482,7 +438,7 @@ async function marcarBadge(accion) {
     if (e.ok) {
       btn.textContent = accion === 'entrada' ? '✅ Entrada' : '🚪 Salida';
       setTimeout(() => { btn.disabled = false; }, 1500);
-      refrescarBadge(); // actualizar estado
+      setTimeout(() => { refrescarBadge(); }, 800);
     } else {
       btn.textContent = '⚠️ ' + (e.motivo || 'error');
       setTimeout(() => { btn.disabled = false; btn.textContent = accion === 'entrada' ? '✅ Entrada' : '🚪 Salida'; }, 2000);
@@ -499,6 +455,8 @@ async function refrescar() {
     const e = await r.json();
     document.getElementById('sub').textContent =
       `zona: ${e.zona} · perfil: ${e.perfil} · modelo: ${e.modelo} · ${e.whatsapp_modo}`;
+    document.getElementById('estado-camara').textContent =
+      e.estado_camara_mensaje || 'Reconociendo…';
     const nombres = {'Person':'Personas','helmet':'Cascos','no_helmet':'SIN CASCO',
       'gloves':'Guantes','no_gloves':'SIN GUANTES','vest':'Chalecos',
       'boots':'Botas','no_boots':'SIN BOTAS','goggles':'Gafas',
@@ -532,19 +490,25 @@ async function refrescarJornadaAlertas(alertas) {
     return;
   }
   cont.innerHTML = alertas.map(a => {
+    const esMalTrazada = a.tipo_alerta === 'salida_mal_trazada';
+    const icono = esMalTrazada ? '🕒' : '⚠️';
+    const colorTipo = esMalTrazada ? 'var(--azul)' : 'var(--rojo)';
     const excede = a.excede_jornada_maxima ? ' (EXCEDE JORNADA MÁXIMA)' : '';
+    const motivo = a.motivo || '';
     return `
-      <div class="alerta-jornada">
-        <div class="hora">⚠️ ${a.nombre || 'Desconocido'} (${a.badge_id})${excede}</div>
+      <div class="alerta-jornada" style="border-left-color:${colorTipo};">
+        <div class="hora" style="color:${colorTipo};">${icono} ${a.nombre || 'Desconocido'} (${a.badge || '—'})${excede}</div>
         <div class="detalle">
+          ${esMalTrazada ? '<strong>Salida mal trazada:</strong> ' : ''}
           Entró: ${a.hora_entrada ? new Date(a.hora_entrada).toLocaleTimeString('es-CO') : '—'} ·
           Horas dentro: ${a.horas_dentro} h ·
           Turno: ${a.turno || '—'} ·
           Puesto: ${a.puesto || '—'}
         </div>
+        <div class="detalle" style="font-size:.7rem; color:var(--gris); margin-top:4px;">${motivo}</div>
         ${a.excede_jornada_maxima
           ? `<button class="btn-forzar" onclick="forzarSalida('${a.badge_id}')">Forzar salida y cancelar nómina</button>`
-          : '<span style="color:var(--gris); font-size:.7rem;">Aún dentro de la jornada máxima</span>'
+          : '<span style="color:var(--gris); font-size:.7rem;">Requiere revisión del supervisor</span>'
         }
       </div>`;
   }).join('');
@@ -568,7 +532,7 @@ async function forzarSalida(badgeId) {
 }
 
 setInterval(refrescar, 1500); refrescar();
-</script></body></html>"""
+</div></script></body></html>"""
 
 
 class ActuadorWhatsAppAsync(ActuadorWhatsApp):
@@ -631,12 +595,18 @@ class PanelSafeSite:
         self.marca_fps = time.time()
         self.fps = 0.0
         self.incidentes = collections.deque(maxlen=50)
+        # ---------- maquina de estados de la camara (Fase 1) ----------
+        self.estado_camara = config.ESTADO_RECONOCIENDO
+        self.estado_camara_ts = time.time()
+        self.estado_camara_mensaje = "Reconociendo…"
+        self._badge_en_proceso = None   # badge_id que esta siendo procesado ahora
         # ---------- lector de badges QR (hilo separado para >=30 FPS) ----------
         self.lector_qr = LectorBadgeQR(cooldown_segundos=2.0,
                                        detectar_cada_n_frames=10)
         self.lector_qr.iniciar()  # hilo separado: no bloquea el video
         self.ultima_lectura = None   # LecturaBadge más reciente
         self.badges_activos = {}     # badge_id -> {"datos": dict, "ultima_deteccion": float}
+        self._ultima_marcacion = {}  # badge_id -> timestamp de última entrada/salida automática
         # Las cards de badge se mantienen visibles hasta que el trabajador
         # marque salida (no expiran por tiempo).
 
@@ -649,62 +619,105 @@ class PanelSafeSite:
         cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         print(f"🎥 webcam abierta ({int(cam.get(3))}x{int(cam.get(4))})", flush=True)
         while True:
-            ok, frame = cam.read()
-            if not ok:
-                time.sleep(0.01)
-                continue
+            try:
+                hay_badge_activo = False
+                lectura = None
+                ok, frame = cam.read()
+                if not ok:
+                    time.sleep(0.01)
+                    continue
 
-            # ---------- lectura de badge QR (hilo separado, no bloquea) ----------
-            self.lector_qr.encolar_frame(frame)
-            lecturas = self.lector_qr.obtener_lecturas()
+                print(f"🔄 [bucle] inicio iteración", flush=True)
 
-            # Solo procesar EPP (YOLO) si hay un badge ACTIVO detectado
-            hay_badge_activo = False
-            if lecturas:
-                lectura = lecturas[0]
-                self.ultima_lectura = lectura
-                if (lectura.badge and lectura.badge.valido
-                        and lectura.badge.estado_badge == "activo"):
+                # ---------- lectura de badge QR (hilo separado, no bloquea) ----------
+                self.lector_qr.encolar_frame(frame)
+                lecturas = self.lector_qr.obtener_lecturas()
+                print(f"📡 [bucle] lecturas QR obtenidas: {len(lecturas)}", flush=True)
+
+                ahora_ts = time.time()
+
+                # Determinar si hay un badge ACTIVO detectado
+                # Prioridad: lecturas del frame actual, luego última lectura reciente como respaldo
+                lectura = None
+                if lecturas:
+                    lectura = lecturas[0]
+                    self.ultima_lectura = lectura
+                elif self.ultima_lectura and self.ultima_lectura.badge \
+                        and (ahora_ts - self.ultima_lectura.badge.timestamp) < 3.0:
+                    lectura = self.ultima_lectura
+
+                if lectura and lectura.badge and lectura.badge.valido:
                     hay_badge_activo = True
+                    bid = lectura.badge.badge_id
+                    nombre = lectura.badge.nombre or "trabajador"
+                    pass  # log silencioso: badge activo detectado
+                else:
+                    bid = None
+                    nombre = None
 
-            if hay_badge_activo:
-                incidentes, filtradas = self.agente.procesar_frame(
-                    frame, zona=self.zona, t_stamp=time.time())
-                anotado = self.agente.percepcion.anotar(frame, filtradas)
-                self._conteos = self._contar(filtradas)
-                self._faltas = [d for d in filtradas
-                                if d.cls_id in config.CLASES_INCUMPLIMIENTO]
-            else:
-                incidentes = []
-                filtradas = []
-                anotado = frame.copy()
-                self._conteos = {}
-                self._faltas = []
+                # ---------- maquina de estados de la camara ----------
+                if not hay_badge_activo:
+                    self.estado_camara = config.ESTADO_RECONOCIENDO
+                    self.estado_camara_mensaje = "Reconociendo…"
+                    self._badge_en_proceso = None
+                elif lectura and lectura.badge:
+                    # Nuevo badge detectado o re-detección
+                    if self._badge_en_proceso is None or self._badge_en_proceso != bid:
+                        self._badge_en_proceso = bid
+                        self.estado_camara = config.ESTADO_RECONOCIDO
+                        self.estado_camara_mensaje = (
+                            f"Miembro de personal reconocido: {nombre}")
+                        print(f"🟢 [bucle] estado → RECONOCIDO para {bid}", flush=True)
+                    else:
+                        self.estado_camara = config.ESTADO_ESCANEANDO_EPP
+                        self.estado_camara_mensaje = "Escaneando EPP apropiado…"
+                        print(f"🔍 [bucle] estado → ESCANEANDO_EPP para {bid}", flush=True)
 
-            # ---------- recuadro del QR (siempre visible al detectar) ----------
-            if lecturas:
-                lectura = lecturas[0]
-                if lectura.caja:
-                    x1, y1, x2, y2 = [int(v) for v in lectura.caja]
-                    es_valido = (lectura.badge is not None
-                                 and lectura.badge.valido)
+                if hay_badge_activo:
+                    try:
+                        print(f"⚙️ [bucle] llamando a procesar_frame…", flush=True)
+                        incidentes, filtradas = self.agente.procesar_frame(
+                            frame, zona=self.zona, t_stamp=time.time())
+                        anotado = self.agente.percepcion.anotar(frame, filtradas)
+                        self._conteos = self._contar(filtradas)
+                        self._faltas = [d for d in filtradas
+                                        if d.cls_id in config.CLASES_INCUMPLIMIENTO]
+                    except Exception as e:
+                        print(f"❌ error procesando frame YOLO: {e}", flush=True)
+                        incidentes = []
+                        filtradas = []
+                        anotado = frame.copy()
+                        self._conteos = {}
+                        self._faltas = []
+                else:
+                    incidentes = []
+                    filtradas = []
+                    anotado = frame.copy()
+                    self._conteos = {}
+                    self._faltas = []
+                print(f"✅ [bucle] procesar_frame completado, incidentes={len(incidentes)}, filtradas={len(filtradas)}", flush=True)
+
+                # ---------- recuadro del QR (persiste mientras haya lectura reciente) ----------
+                lectura_dibujar = lecturas[0] if lecturas else self.ultima_lectura
+                if lectura_dibujar and lectura_dibujar.caja \
+                        and lectura_dibujar.badge \
+                        and (ahora_ts - lectura_dibujar.badge.timestamp) < 3.0:
+                    print(f"📐 [bucle] dibujando recuadro QR", flush=True)
+                    x1, y1, x2, y2 = [int(v) for v in lectura_dibujar.caja]
+                    es_valido = (lectura_dibujar.badge is not None
+                                 and lectura_dibujar.badge.valido)
                     color = (0, 200, 0) if es_valido else (0, 0, 200)
                     cv2.rectangle(anotado, (x1, y1), (x2, y2), color, 3)
                     etiqueta = "QR VALIDO" if es_valido else "QR"
                     cv2.putText(anotado, etiqueta, (x1, max(y1 - 10, 20)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
-            ahora_ts = time.time()
+                with self.lock:
+                    self.ultimo_frame = anotado
+                    print(f"🖼️ [bucle] frame anotado guardado en ultimo_frame", flush=True)
 
-            with self.lock:
-                self.ultimo_frame = anotado
-
-                # ---------- gestionar múltiples badges activos (sin expiración por tiempo) ----------
-                # Las cards se mantienen visibles hasta que el trabajador marque salida.
-                if lecturas:
-                    for lectura in lecturas:
-                        if not lectura.badge:
-                            continue
+                    # ---------- gestionar badge activo ----------
+                    if hay_badge_activo and lectura and lectura.badge:
                         bid = lectura.badge.badge_id
 
                         # Construir datos del badge para el frontend
@@ -740,19 +753,47 @@ class PanelSafeSite:
                             "datos": datos,
                             "ultima_deteccion": ahora_ts,
                         }
-            self.frames += 1
-            ahora = time.time()
-            if ahora - self.marca_fps >= 1.0:
-                self.fps = round(self.frames / (ahora - self.marca_fps), 1)
-                self.frames = 0
-                self.marca_fps = ahora
-            for inc in incidentes:
-                self.incidentes.append({
-                    "t": time.strftime("%H:%M:%S"),
-                    "zona": inc.zona,
-                    "faltas": f"<b>{inc.clase}</b> (conf {inc.conf_media:.0%}, "
-                              f"{inc.frames_consecutivos} frames)",
-                })
+                        print(f"💾 [bucle] badge guardado en badges_activos: {bid}", flush=True)
+
+                        # ---------- entrada/salida automática al reconocer el QR ----------
+                        if lectura.badge.valido and lectura.badge.estado_badge == "activo":
+                            ultima = self._ultima_marcacion.get(bid, 0)
+                            print(f"⏱️ [bucle] cooldown check: ahora_ts={ahora_ts:.1f}, ultima={ultima:.1f}, diff={ahora_ts-ultima:.1f}s", flush=True)
+                            if ahora_ts - ultima >= 5.0:  # cooldown de 5s entre marcaciones
+                                try:
+                                    dentro = registro_asistencia.esta_dentro(bid)
+                                    print(f"🚪 [bucle] esta_dentro({bid})={dentro}", flush=True)
+                                    if dentro:
+                                        print(f"🚪 [bucle] llamando a marcar_salida({bid})…", flush=True)
+                                        registro_asistencia.marcar_salida(bid)
+                                        print(f"🚪 [bucle] SALIDA automática: {bid} ({nombre})", flush=True)
+                                    else:
+                                        print(f"✅ [bucle] llamando a marcar_entrada({bid})…", flush=True)
+                                        registro_asistencia.marcar_entrada(bid)
+                                        print(f"✅ [bucle] ENTRADA automática completada: {bid} ({nombre})", flush=True)
+                                    self._ultima_marcacion[bid] = ahora_ts
+                                    print(f"💾 [bucle] _ultima_marcacion[{bid}]={ahora_ts:.1f}", flush=True)
+                                except Exception as e:
+                                    print(f"❌ [bucle] Error marcando badge {bid}: {type(e).__name__}: {e}", flush=True)
+                                    self._ultima_marcacion[bid] = ahora_ts  # evitar reintento inmediato
+                self.frames += 1
+                ahora = time.time()
+                if ahora - self.marca_fps >= 1.0:
+                    self.fps = round(self.frames / (ahora - self.marca_fps), 1)
+                    self.frames = 0
+                    self.marca_fps = ahora
+                for inc in incidentes:
+                    self.incidentes.append({
+                        "t": time.strftime("%H:%M:%S"),
+                        "zona": inc.zona,
+                        "faltas": f"<b>{inc.clase}</b> (conf {inc.conf_media:.0%}, "
+                                  f"{inc.frames_consecutivos} frames)",
+                    })
+                print(f"🏁 [bucle] fin de iteración, fps={self.fps}", flush=True)
+            except Exception as e:
+                print(f"❌ error en bucle de captura: {e}", flush=True)
+                time.sleep(0.1)
+                continue
 
     @staticmethod
     def _contar(filtradas):
@@ -895,20 +936,29 @@ class PanelSafeSite:
             "badges": badges_lista,
             "badge": badges_lista[0] if badges_lista else None,
             "alertas_jornada": alertas_jornada,
+            # ---------- maquina de estados de la camara ----------
+            "estado_camara": self.estado_camara,
+            "estado_camara_mensaje": self.estado_camara_mensaje,
         }
 
     # ---------- endpoints de badges v2 ----------
     def badge_estado(self):
         """Devuelve solo badges detectados recientemente (cards dinámicas).
         Aparecen al escanear QR, desaparecen al marcar salida."""
-        badges_lista = []
-        for bid, d in self.badges_activos.items():
-            datos = d["datos"].copy()
+        try:
+            badges_lista = []
             ahora_ts = time.time()
-            datos["detectado_recientemente"] = (ahora_ts - d["ultima_deteccion"]) < 8.0
-            datos["tiempo_deteccion"] = d["ultima_deteccion"]
-            badges_lista.append(datos)
-        return badges_lista
+            with self.lock:
+                for bid, d in self.badges_activos.items():
+                    datos = d["datos"].copy()
+                    datos["detectado_recientemente"] = (ahora_ts - d["ultima_deteccion"]) < 8.0
+                    datos["tiempo_deteccion"] = d["ultima_deteccion"]
+                    badges_lista.append(datos)
+            print(f"📡 [estado] badge_estado devolviendo {len(badges_lista)} badges: {[b.get('badge_id') for b in badges_lista]}", flush=True)
+            return badges_lista
+        except Exception as e:
+            print(f"❌ [estado] error en badge_estado: {e}", flush=True)
+            return []
 
     def badge_jornada_alertas(self):
         """Devuelve alertas de empleados que excedieron la jornada sin salir."""

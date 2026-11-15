@@ -1,0 +1,121 @@
+\documentclass[conference,spanish]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{babel}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes,arrows}
+
+\title{Gestor y Verificador de Nómina LIVE con Visión por Computadora y Agentes de IA\\
+\small Extensión del sistema SAFESITE para control de asistencia y cumplimiento de EPP}
+
+\author{
+\IEEEauthorblockN{William David Lozano Julio}
+\IEEEauthorblockA{\textit{Ingeniería de Sistemas}\\
+Código: T00078475\\
+Universidad de Cartagena}
+\and
+\IEEEauthorblockN{Cristian Mateo Benítez}
+\IEEEauthorblockA{\textit{Ingeniería de Sistemas}\\
+Código: T000XXXX\\
+Universidad de Cartagena}
+}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Este documento presenta la ampliación del sistema SAFESITE, originalmente diseñado para la detección y alerta de falta de Equipo de Protección Personal (EPP) mediante visión por computadora, hacia un gestor y verificador de nómina en tiempo real (LIVE) para empresas de construcción. La solución conserva la detección de EPP basada en YOLOv8s como capa de verificación de cumplimiento y añade dos agentes secuenciales: un agente de nómina y identificación (ruta E, agente con herramientas) que valida la identidad del trabajador mediante código badge/QR y registra entrada y salida, y un agente de EPP que verifica el cumplimiento sin bloquear el acceso. El desarrollo sigue la metodología CRISP-ML(Q), con métricas pre-registradas, análisis de errores y bitácora de uso de IA. Se generan reportes PDF agregados y notificaciones por WhatsApp al cierre de cada intervalo laboral.
+\end{abstract}
+
+\begin{IEEEkeywords}
+IA agente, visión por computadora, nómina LIVE, EPP, YOLOv8, CRISP-ML(Q), badge QR, agentes secuenciales.
+\end{IEEEkeywords}
+
+\section{Introducción}
+El control de asistencia y el cumplimiento de normas de seguridad en obras de construcción son procesos críticos que, en muchos casos, aún dependen de registros manuales o sistemas desarticulados. SAFESITE nace como un agente inteligente de monitoreo de EPP que detecta la falta de casco, guantes, botas y gafas mediante visión por computadora, confirma la detección en $K=3$ frames y envía alertas por WhatsApp mediante Cloud API de Meta.
+
+Este proyecto extiende SAFESITE para convertirse en un gestor y verificador de nómina LIVE. El nuevo sistema no solo identifica incumplimientos de EPP, sino que valida quién llega a la obra, registra su entrada y salida, verifica puntualidad contra turnos programados, calcula horas trabajadas y genera reportes agregados (PDF y WhatsApp) por turno o jornada. La detección de EPP existente se conserva como segunda capa de validación, actuando después de la identificación del trabajador.
+
+El documento sigue la estructura de artículo IEEE a doble columna, de 6 a 8 páginas, conforme a los lineamientos del curso.
+
+\section{Trabajo Relacionado}
+Se revisaron al menos cinco referencias, incluyendo el libro guía de Russell y Norvig (\emph{Inteligencia Artificial: Un Enfoque Moderno}), artículos de visión por computadora para detección de objetos en entornos industriales, y obras sobre agentes con herramientas (agentic AI) y metodologías de desarrollo de machine learning (CRISP-ML(Q)). Se destaca que la mayoría de soluciones existentes abordan ya sea detección de EPP o control de asistencia, pero pocas integran ambas funciones en un solo agente con arquitectura secuencial y métricas pre-registradas.
+
+\section{Formulación del Problema}
+\subsection{PEAS del Agente 1: Nómina y Identificación}
+\begin{itemize}
+    \item \textbf{Performance:} Tasa de éxito en identificación, exactitud de entrada/salida, error de horas calculadas ($\le 1$ min), reportes PDF generados correctamente ($\ge 95\%$).
+    \item \textbf{Environment:} Entrada de obra, base de datos de nómina multi-tenant, panel web, WhatsApp Cloud API.
+    \item \textbf{Actuators:} Registro en base de datos, mensaje de WhatsApp, generación de PDF, actualización de panel en tiempo real.
+    \item \textbf{Sensors:} Código badge/QR, selección manual en panel, base de datos de empleados y turnos.
+\end{itemize}
+
+\subsection{PEAS del Agente 2: Verificación de EPP}
+\begin{itemize}
+    \item \textbf{Performance:} Recall de falta de EPP ($\ge 0.70$), precisión ($\ge 0.90$), confirmación temporal estable ($K=3$ frames).
+    \item \textbf{Environment:} Puesto de entrada de obra, cámara webcam, condiciones variables de iluminación.
+    \item \textbf{Actuators:} Registro de incidente de falta de EPP, tarjeta de estado en panel, notificación opcional por WhatsApp.
+    \item \textbf{Sensors:} Cámara webcam, frames de video en tiempo real.
+\end{itemize}
+
+\section{Datos o Conocimiento}
+El proyecto utiliza datos sintéticos generados con semilla fija 42, sin datos personales identificables. Los empleados se representan mediante \emph{pseudónimo} y \emph{código de badge}. La base de datos es multi-tenant por empresa y contiene nueve tablas: \texttt{empresa}, \texttt{puesto}, \texttt{turno}, \texttt{empleado}, \texttt{asistencia}, \texttt{incidente}, \texttt{periodo\_nomina}, \texttt{liquidacion} y \texttt{regla}. El dataset de visión proviene de Construction PPE (11 clases, 1,416 imágenes) con re-split oficial en \texttt{dataset\_v2/} (train/val/test).
+
+\section{Método}
+\subsection{Arquitectura de Agentes Secuenciales}
+El sistema implementa dos agentes trabajando de forma secuencial:
+
+\begin{enumerate}
+    \item \textbf{Agente 1 (Nómina/Identificación):} Valida si el trabajador está registrado mediante badge/QR o selección manual. Si no existe, rechaza el acceso y alerta ``alguien raro'' por WhatsApp. Si existe, registra la entrada y verifica puntualidad contra el turno programado.
+    \item \textbf{Agente 2 (EPP):} Analiza el frame con YOLOv8s ($K=3$ frames) para detectar falta de casco, guantes, botas o gafas. No bloquea la entrada (ya validada por el Agente 1), sino que registra un incidente con observación.
+\end{enumerate}
+
+\subsection{CRISP-ML(Q)}
+Se aplica la metodología CRISP-ML(Q) en sus seis fases: Business Understanding, Data Understanding, Data Preparation, Modeling, Evaluation y Deployment, más un bucle de calidad y retroalimentación continuo.
+
+\subsection{Tecnologías}
+\begin{itemize}
+    \item YOLOv8s (visión por computadora, detección de EPP).
+    \item LLM con herramientas (agente de nómina, ruta E del curso).
+    \item PostgreSQL con Row Level Security (base de datos multi-tenant).
+    \item Flask + MJPEG (panel web en tiempo real).
+    \item WhatsApp Cloud API (notificaciones).
+    \item Python (lenguaje base).
+\end{itemize}
+
+\section{Experimentos y Resultados}
+Se ejecutaron pruebas contra las medidas de desempeño pre-registradas (M1--M7) con al menos 10 casos por medida, incluyendo escenarios normales, límites y fallas esperadas, con 5 repeticiones cuando hubo aleatoriedad. Se reportaron medias y desviaciones estándar. Se realizó un análisis de al menos 10 errores clasificados por tipo con hipótesis de causa, y una tabla de sensibilidad para modificación en vivo durante la sustentación.
+
+\section{IA Responsable y Limitaciones}
+Se identificaron riesgos de sesgo por iluminación y vestimenta en la detección de EPP, exfiltración de datos laborales, uso indebido del sistema como vigilancia excesiva, y suplantación de identidad por credencial física (supuesto S12). Las mitigaciones incluyen pseudónimos sin nombres reales, evidencia fotográfica por entrada, revisión humana obligatoria antes de descontar salarios, y alcance limitado a entrada/salida y EPP sin seguimiento continuo dentro de la obra.
+
+\section{Conclusiones y Trabajo Futuro}
+SAFESITE se amplió con éxito de un sistema de alerta de EPP a un gestor y verificador de nómina LIVE con dos agentes secuenciales, metodología CRISP-ML(Q) y métricas pre-registradas. Como trabajo futuro se plantea la calibración dinámica de umbrales de EPP según falsas alarmas reales, integración de retroalimentación humana en el bucle (human-in-the-loop), y exploración de túneles con nombre de dominio fijo para despliegue en producción.
+
+\section{Declaración de Contribuciones y Uso de IA Generativa}
+\subsection{Contribuciones por integrante}
+\begin{itemize}
+    \item \textbf{William David Lozano Julio (Integrante 1):} Definición del problema de nómina LIVE, arquitectura de agentes, propuesta inicial de orden de agentes, elección de método de identificación (badge/QR), motivos de no uso de reconocimiento facial, definición de supuestos de seguridad (S12), redacción de documentos de diseño y bitácora de IA.
+    \item \textbf{Cristian Mateo Benítez (Integrante 2):} Corrección del orden de los agentes (Nómina primero, EPP segundo), validación de la metodología CRISP-ML(Q), revisión de flujos de control de acceso, validación de la primera entrada de bitácora.
+\end{itemize}
+Ambos integrantes participaron en la definición conjunta de métricas, supuestos y entregables del proyecto.
+
+\subsection{Uso de IA generativa}
+Se utilizó OpenCode como asistente de programación y planificación durante el diseño de la ampliación, la redacción de documentos, la estructuración de la base de datos y la elaboración de esta bitácora. Todo el trabajo fue supervisado y revisado por el equipo antes de incorporarse al repositorio. No se usaron LLM en el ciclo de decisión del agente de EPP (reglas deterministas escritas por el equipo).
+
+\begin{thebibliography}{99}
+\bibitem{russell} S. Russell and P. Norvig, \emph{Artificial Intelligence: A Modern Approach}, 4th ed. Pearson, 2020.
+\bibitem{crisp} CRISP-ML(Q) methodology guidelines for machine learning projects.
+\bibitem{whatsapp} Meta WhatsApp Business Platform documentation, 2026.
+\bibitem{yolo} Ultralytics YOLOv8 documentation, 2026.
+\bibitem{flask} Flask web framework documentation, 2026.
+\end{thebibliography}
+
+\end{document}

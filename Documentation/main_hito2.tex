@@ -1,0 +1,82 @@
+\documentclass[10pt,letterpaper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}
+\usepackage[spanish]{babel}
+\usepackage[top=1.4cm,bottom=1.4cm,left=1.8cm,right=1.8cm]{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{ragged2e}
+\usepackage{amsmath}
+\usepackage{titlesec}
+\usepackage{graphicx}
+
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{P}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+
+\titleformat{\section}{\normalsize\bfseries}{\thesection.}{0.4em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{}{0pt}{}
+\titlespacing*{\section}{0pt}{5pt}{1.5pt}
+\titlespacing*{\subsection}{0pt}{2.5pt}{1pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{2pt}
+\pagestyle{empty}
+\hypersetup{hidelinks}
+
+\begin{document}
+
+\begin{center}
+{\large\bfseries SAFESITE-AGENT --- Hito 2\\[2pt]}
+{\small Avance del proyecto: datos, línea base y primer resultado en el repositorio\\[4pt]}
+{\small William David Lozano Julio (T00078475) · Cristian Matteo Benítez Montes (T00078658)\\
+Inteligencia Artificial, Universidad Tecnológica de Bolívar · Prof. Edwin Alexander Puertas Del Castillo · Noviembre de 2026}
+\end{center}
+
+\vspace{2pt}
+
+\section{Estado de avance del proyecto (Hito 2)}
+
+El proyecto SAFESITE-AGENT se encuentra en fase de ejecución avanzada. El \textbf{dataset y el conocimiento están listos}, la \textbf{línea base de entrenamiento ya se ejecutó} y existen \textbf{primeros resultados versionados en el repositorio}.
+
+\subsection{Datos y conocimiento listos}
+Se dispone del re-split oficial del dataset Construction-PPE en \texttt{dataset\_v2/} (1,413 imágenes, 11 clases: \texttt{helmet, vest, boots, gloves, goggles, none, Person, no\_helmet, no\_goggle, no\_gloves, no\_boots}): 1,130 de entrenamiento, 143 de validación y 140 de prueba local. Los splits corrigen la contaminación train/test detectada en el análisis exploratorio (EDA). Las imágenes crudas y el \texttt{.ndjson} se mantienen en solo lectura (\texttt{safesite\_dataset/}) porque tres URLs del CDN expiraron y el dataset no es regenerable desde internet. Toda la documentación de datos (EDA, diccionario, resúmenes) está en \texttt{eda/} y \texttt{Documentation/}.
+
+\subsection{Línea base ejecutándose}
+Se entrenó la línea base \texttt{baseline\_v1} (YOLOv8n, batch 8, seed 42, 72 épocas, RTX 4050): val mAP50 0.580 / test mAP50 0.520. Las clases de EPP presente son fuertes (helmet AP50 0.93 en test) pero las clases de incumplimiento \texttt{no\_*} son débiles a nivel de fotograma (recall \texttt{no\_helmet} 0.47 val / 0.15 test), confirmando el hallazgo F5 del EDA. Ante este límite, se entrenó \texttt{tuned\_v2\_s} (YOLOv8s, datos con oversampling de incumplimientos), que es hoy el \textbf{checkpoint de despliegue} (\texttt{runs/safesite/tuned\_v2\_s/weights/best.pt}): recall de incidente \texttt{no\_helmet} 0.963 val / 0.833 test, superando el criterio pre-registrado ($\geq 0.70$) con holgura.
+
+\subsection{Primer resultado en el repositorio}
+El núcleo del agente (\texttt{src/safesite/}) funciona end-to-end: percepción $\rightarrow$ confirmación temporal ($K=3$ frames) $\rightarrow$ cooldown $\rightarrow$ alerta (consola + payload WhatsApp DRY-RUN) $\rightarrow$ historial. Se validó con la suite de pruebas Fase 3 (\texttt{src/safesite/pruebas\_medidas.py}): las 4 medidas pre-registradas CUMPLE (M1 recall 0.964/0.962, M2 falsas alarmas 0.035/0.026, M3 alerta 2.99 s $<10$ s, M4 cooldown 0 duplicadas). Todo está versionado en Git (push a GitHub realizado).
+
+\section{Modificaciones respecto al plan inicial del Hito 1}
+
+El documento de Hito 1 (\texttt{Documentation/main.tex}) planteaba SAFESITE V2 como un gestor de nómina LIVE con dos agentes secuenciales (Agente 1 de nómina/identificación + Agente 2 de EPP). \textbf{Sí hay modificaciones respecto a ese plan inicial}, y se justifican así:
+
+\begin{itemize}
+\item El alcance se centró primero en el \textbf{Agente 2 de verificación de EPP} (visión por computadora + alertas WhatsApp por Cloud API de Meta), que es el módulo con resultado demostrable y métricas validadas. El Agente 1 de nómina LIVE (badge/QR, asistencia, horas, reportes PDF) quedó definido arquitectónicamente y con datos sintéticos listos, pero su implementación completa se pospuso como extensión posterior.
+\item La línea base original contemplaba comparar un LLM con herramientas vs. uno sin herramientas en tareas de nómina. En la práctica se priorizó validar la métrica de negocio del agente de EPP: \textbf{recall de incidente $\geq 0.70$}, que es el criterio que sí se midió y cumplió.
+\item El despliegue previsto en Hugging Face Spaces no fue posible (plan gratuito eliminado, error 402); la demostración pública se publicó en \textbf{Google Cloud Run} (24/7).
+\end{itemize}
+
+En resumen: las modificaciones son \textbf{de alcance y prioridad, no de objetivo}. El propósito original (control de acceso, asistencia y cumplimiento de EPP con agentes de IA) se mantiene; lo que cambió es el orden de entrega y la plataforma de demostración, para contar con un primer resultado medible y versionado en este hito.
+
+\section{Bitácora de uso de IA (primeras entradas)}
+
+Se llevó un registro de cómo se utilizó la IA generativa (OpenCode) durante el desarrollo. Todo el código fue supervisado y revisado por el equipo antes de incorporarse al repositorio; el ciclo de decisión del agente de EPP usa reglas deterministas, no LLM.
+
+\begin{tabularx}{\textwidth}{P{0.28\textwidth}Y P{0.16\textwidth}}
+\toprule
+\textbf{Decisión / acción} & \textbf{Qué hizo la IA} & \textbf{Qué hizo el equipo} \\
+\midrule
+Re-split oficial del dataset (eliminar contaminación train/test) & Propuso y ejecutó el re-split determinista (seed 42) & Validó las cifras resultantes (train/val/test) antes de entrenar \\
+Elegir el modelo de despliegue (baseline\_v1 vs tuned\_v2\_s) & Ejecutó la comparación de experimentos sobre métrica de incidente & Aplicó el criterio pre-registrado y confirmó la elección \\
+Corregir cajas de gafas ancladas bajo el rostro (observación del panel en vivo) & Midió el sesgo, identificó que es heredado del dataset fuente, calculó el anclaje anatómico & Elegió la corrección cosmética (sin reentrenar) para no arriesgar métricas validadas \\
+Suite de pruebas con medidas pre-registradas (M1--M4) & Implementó escenarios y recolección de logs & Validó umbrales y resultados contra el enunciado \\
+Demo publicada en la nube (Google Cloud Run) & Construyó la interfaz, imagen Docker y flujo de publicación & Elegió la plataforma, configuró el presupuesto, verificó el despliegue \\
+\end{tabularx}
+
+\vspace{2pt}
+\textbf{Herramientas de IA utilizadas:} OpenCode (asistente de programación, EDA, entrenamiento YOLO, núcleo del agente, panel web, suite de pruebas, demo, documentación) y Ultralytics YOLOv8 (componente del agente, red entrenada por el equipo con épocas y semilla fijas). No se usaron LLM en el ciclo de decisión del agente de EPP.
+
+\end{document}

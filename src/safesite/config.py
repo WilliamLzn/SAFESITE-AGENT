@@ -96,3 +96,30 @@ MAX_MENSAJES_HORA = 20      # techo de mensajes en una hora rodante
 DIR_SALIDAS_AGENTE = "runs/agente"
 DIR_ALERTAS = "runs/agente/alertas"          # frames anotados de incidentes confirmados
 ARCHIVO_HISTORIAL = "runs/agente/historial_incidentes.jsonl"
+
+# --- Maquina de estados de la camara (Fase 1 del Hito 2+) ---
+# Estados por los que pasa el modulo de camara para que el supervisor
+# vea en que etapa del proceso esta el trabajador detectado.
+ESTADO_RECONOCIENDO = "reconociendo"      # buscando badge QR frente a la camara
+ESTADO_RECONOCIDO = "reconocido"          # badge valido detectado
+ESTADO_ESCANEANDO_EPP = "escanEando_epp"  # analizando EPP con YOLO (K frames)
+ESTADO_COMPLETADO = "completado"          # EPP procesado, listo para volver al inicio
+
+# Transiciones:
+#   sin badge        -> RECONOCIENDO
+#   badge valido     -> RECONOCIDO
+#   frame listo YOLO -> ESCANEANDO_EPP
+#   despues de procesar EPP -> RECONOCIENDO (ciclo continuo)
+
+# --- Emojis por puesto/rama de trabajo (badges mas llamativos) ---
+# Mapeo del campo "puesto" del badge QR a un emoji representativo.
+EMOJI_POR_PUESTO = {
+    "supervisor_hse": "🦺",      # supervisor de seguridad
+    "albañil": "🧱",             # albañil / construccion
+    "electricista": "⚡",         # electricista
+    "ayudante": "🛠️",            # ayudante general
+    "operario_grua": "🏗️",       # operario de grua
+    "soldador": "🔥",            # soldador
+    "": "👷",                    # por defecto (trabajador generico)
+    None: "👷",
+}

@@ -1,64 +1,95 @@
-\documentclass[conference,spanish]{IEEEtran}
+\documentclass[10pt,letterpaper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage{babel}
+\usepackage{mathptmx}
+\usepackage[spanish]{babel}
+\usepackage[top=1.6cm,bottom=1.4cm,left=2cm,right=2cm]{geometry}
 \usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{tabularx}
 \usepackage{array}
 \usepackage{ragged2e}
 \usepackage{amsmath}
+\usepackage{titlesec}
+
+% ---- Pon \portadafalse si la portada cuenta dentro del limite de 1 pagina ----
+\newif\ifportada
+\portadatrue
 
 \newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
 \newcolumntype{P}[1]{>{\RaggedRight\arraybackslash}p{#1}}
 
-\title{Propuesta de proyecto: SAFESITE V2\\
-\small Hito 1 -- Problema, ruta, datos y medidas de desempeño}
-
-\author{
-\IEEEauthorblockN{William David Lozano Julio \hspace{0.4em}--\hspace{0.4em} T00078475 \\
-Cristian Matteo Benitez Montes \hspace{0.4em}--\hspace{0.4em} T00078658}
-\IEEEauthorblockA{Curso de Inteligencia Artificial -- Universidad de Cartagena\\
-Profesor: Edwin Puerta}
-}
-\date{3 de noviembre de 2026}
+\titleformat{\section}{\normalsize\bfseries}{\thesection.}{0.4em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{}{0pt}{}
+\titlespacing*{\section}{0pt}{6pt}{2pt}
+\titlespacing*{\subsection}{0pt}{3pt}{1pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{2.5pt}
+\pagestyle{empty}
+\hypersetup{hidelinks}
 
 \begin{document}
-\maketitle
 
-\section{Problema y usuario}
-En las empresas de construcción, el supervisor de seguridad y salud en el trabajo (HSE) necesita saber quién ingresa a la obra, si está registrado en la nómina, cuándo inicia y termina su jornada y si utiliza el Equipo de Protección Personal (EPP) requerido para su puesto. Actualmente, estas tareas pueden realizarse mediante registros manuales y controles separados. Esto dificulta consolidar asistencia, puntualidad, horas trabajadas e incidentes de seguridad en un mismo flujo.
-
-Se propone \textbf{SAFESITE V2}, una evolución del agente original de detección de EPP hacia un gestor y verificador de nómina LIVE. El usuario principal es el supervisor HSE o encargado de obra. El sistema debe identificar al trabajador mediante badge/QR o selección manual, validar su registro, marcar entrada y salida, calcular horas trabajadas y generar reportes agregados en PDF y WhatsApp. No se utilizará reconocimiento facial ni se tomarán decisiones salariales irreversibles sin revisión humana.
-
-\section{Ruta de IA elegida y arquitectura}
-La ruta principal es la \textbf{E: agente con herramientas}. El Agente 1, de Nómina e Identificación, utiliza un LLM con herramientas para consultar empleados y turnos, registrar asistencia, verificar puntualidad, calcular horas y solicitar reportes. Los cálculos numéricos y las reglas laborales permanecen deterministas para facilitar la auditoría.
-
-La Ruta F, visión por computador, funciona como apoyo mediante el Agente 2 de Verificación de EPP. Este agente utiliza YOLOv8s y confirmación temporal de $K=3$ frames para comprobar el EPP requerido por el puesto. El orden es secuencial:
-\[
-\text{identificación y nómina} \rightarrow \text{entrada} \rightarrow \text{EPP} \rightarrow \text{salida} \rightarrow \text{reporte}.
-\]
-
-Si el trabajador no existe en la nómina, se registra el intento no autorizado y se genera una alerta. Si existe, el Agente 1 registra la entrada y el Agente 2 verifica el EPP. La falta de EPP genera un incidente y una observación, pero no sustituye la validación de identidad ni bloquea automáticamente la entrada. El proyecto se organizará con CRISP-ML(Q): comprensión del negocio y los datos, preparación, modelado, evaluación, despliegue y control continuo de calidad.
-
-\section{Datos, origen y licencia}
-La solución utilizará dos fuentes de datos. Para el Agente 2 se empleará el dataset oficial \emph{Construction-PPE} de Ultralytics, con 1,416 imágenes y 11 clases relacionadas con EPP presente y ausente. La documentación oficial indica licencia AGPL-3.0; se conservará la atribución y se respetarán sus condiciones de uso \cite{ultralytics_dataset}. La copia disponible contiene 1,413 imágenes por la expiración de tres URL del CDN. Se utilizarán los splits preparados en \texttt{dataset\_v2/}: 1,130 imágenes de entrenamiento, 143 de validación y 140 de prueba local.
-
-Para el Agente 1 se generarán datos sintéticos de nómina con semilla 42. Incluirán empresas, puestos, turnos, empleados pseudonimizados, asistencias, incidentes, períodos de nómina y reglas configurables. No se usarán nombres reales, rostros, cédulas ni salarios reales. La identificación se simulará mediante códigos badge/QR y casos controlados de credencial válida, inválida o duplicada.
-
-\section{Línea base y solución propuesta}
-La línea base principal será un LLM con prompt único y sin herramientas, evaluado en las mismas tareas de nómina. La solución será el Agente 1 con herramientas deterministas y estado de asistencia, conectado secuencialmente al Agente 2 YOLOv8s. Esta comparación permitirá medir si el uso de herramientas mejora la ejecución de tareas frente a una respuesta conversacional sin acceso a datos ni acciones externas. La visión EPP se comparará adicionalmente con el detector base sin confirmación temporal.
-
-\begin{table}[htbp]
+\ifportada
+\begin{titlepage}
 \centering
-\caption{Medidas y umbrales definidos antes de experimentar}
-\label{tab:metricas}
-\scriptsize
-\begin{tabularx}{\columnwidth}{P{0.29\columnwidth}Y P{0.19\columnwidth}}
+\vspace*{3.2cm}
+{\LARGE\bfseries Propuesta del Proyecto Final:\par}
+\vspace{0.4cm}
+{\LARGE\bfseries SAFESITE V2: agente con herramientas para control de nómina, asistencia y verificación de EPP en obras de construcción\par}
+\vspace{2.2cm}
+{\itshape William David Lozano Julio, T00078475\\
+Cristian Matteo Benítez Montes, T00078658\par}
+\vspace{2.2cm}
+Revisado por\\
+Prof. Edwin Alexander Puertas Del Castillo\par
+\vspace{2.2cm}
+{\Large INTELIGENCIA ARTIFICIAL\\
+UNIVERSIDAD TECNOLÓGICA DE BOLÍVAR}\\[2pt]
+Escuela de Transformación Digital\par
+\vfill
+Noviembre de 2026\par
+\vspace{1cm}
+\end{titlepage}
+\else
+\begin{center}
+{\large\bfseries Propuesta de proyecto: SAFESITE V2 --- Hito 1}\\[2pt]
+{\small William David Lozano Julio (T00078475) · Cristian Matteo Benítez Montes (T00078658)\\
+Inteligencia Artificial, Universidad Tecnológica de Bolívar · Prof. Edwin Alexander Puertas Del Castillo · Noviembre de 2026}
+\end{center}
+\fi
+
+\section{Planteamiento del Problema}
+En construcción, el supervisor de seguridad y salud en el trabajo (HSE) necesita saber quién ingresa a la obra, si está en la nómina, cuándo inicia y termina su jornada y si usa el Equipo de Protección Personal (EPP) requerido para su puesto. Hoy esto se hace con registros manuales y controles separados \cite{garces2026}, lo que dificulta consolidar asistencia, puntualidad, horas trabajadas e incidentes en un mismo flujo.
+
+Se propone \textbf{SAFESITE V2}, una evolución del agente original de detección de EPP hacia un gestor y verificador de nómina LIVE. El sistema identifica al trabajador por badge/QR o selección manual, valida su registro, marca entrada y salida, calcula horas y genera reportes agregados en PDF y WhatsApp. No se usará reconocimiento facial ni se tomarán decisiones salariales irreversibles sin revisión humana.
+
+\subsection{Usuarios objetivo}
+El usuario principal es el supervisor HSE o encargado de obra.
+
+\section{Fuente de información}
+\textbf{Agente 2 (EPP):} dataset oficial \emph{Construction-PPE} de Ultralytics (1,416 imágenes, 11 clases de EPP presente/ausente), con licencia AGPL-3.0; se conservará la atribución y se respetarán sus condiciones \cite{ultralytics_dataset}. La copia disponible tiene 1,413 imágenes (expiraron tres URL del CDN); splits en \texttt{dataset\_v2/}: 1,130 entrenamiento, 143 validación y 140 prueba local.
+
+\textbf{Agente 1 (nómina):} datos sintéticos (semilla 42) de empresas, puestos, turnos, empleados pseudonimizados, asistencias, incidentes y reglas configurables. No se usarán nombres reales, rostros, cédulas ni salarios reales. La identificación se simula con badge/QR (credencial válida, inválida o duplicada).
+
+\section{Ruta de Proyecto}
+La ruta principal es la \textbf{E: agente con herramientas}. El Agente 1, de Nómina e Identificación, usa un LLM con herramientas para consultar empleados y turnos, registrar asistencia, verificar puntualidad, calcular horas y solicitar reportes; los cálculos y reglas laborales son deterministas para facilitar la auditoría. Como apoyo, la \textbf{Ruta F (visión por computador)}: el Agente 2 de Verificación de EPP usa YOLOv8s con confirmación temporal de $K=3$ frames. Flujo secuencial: identificación y nómina $\rightarrow$ entrada $\rightarrow$ EPP $\rightarrow$ salida $\rightarrow$ reporte. Si el trabajador no existe en la nómina se registra el intento y se genera una alerta; la falta de EPP genera un incidente, pero no bloquea automáticamente la entrada. Metodología: CRISP-ML(Q).
+
+\section{Evaluación Antes de Experimentar}
+La evaluación permitirá determinar si usar herramientas mejora la ejecución de las tareas de nómina frente a un LLM sin acceso a datos ni acciones externas.
+
+\subsection{Línea Base}
+Un LLM con prompt único y sin herramientas, evaluado en las mismas tareas de nómina. La solución es el Agente 1 con herramientas y estado de asistencia, conectado al Agente 2 (YOLOv8s); la visión EPP se compara además con el detector base sin confirmación temporal.
+
+\subsection{Métricas y Umbrales de Éxito}
+\vspace{-2pt}
+\footnotesize
+\renewcommand{\arraystretch}{1.05}
+\noindent\begin{tabularx}{\textwidth}{P{0.24\textwidth}Y P{0.14\textwidth}}
 \toprule
-\textbf{Medida} & \textbf{Fórmula o procedimiento} & \textbf{Aceptación} \\
+\textbf{Medida} & \textbf{Fórmula o procedimiento} & \textbf{Umbral} \\
 \midrule
-Éxito de tarea del Agente 1 & Tareas de nómina completadas correctamente / tareas intentadas; mínimo 20 casos & $\geq 0.80$ \\
+Éxito de tarea (Agente 1) & Tareas de nómina correctas / tareas intentadas; mínimo 20 casos & $\geq 0.80$ \\
 Estado de asistencia & F1 para presente, tardanza, bloqueado y ausente & $\geq 0.85$ \\
 Errores de herramientas & Llamadas incorrectas o fallidas / llamadas totales & $\leq 0.05$ \\
 Error de horas & Error absoluto entre horas calculadas y valor esperado & $\leq 1$ min \\
@@ -66,16 +97,17 @@ Recall de incidente EPP & Escenas con falta alertadas / escenas con falta & $\ge
 Reporte y respuesta & Reportes PDF correctos; tiempo por tarea completa & $\geq 0.95$; $<5$ s \\
 \bottomrule
 \end{tabularx}
-\end{table}
+\normalsize
 
-Cada medida se probará con escenarios normales, límites y fallas esperadas: badge inexistente, empleado duplicado, entrada sin salida, cambio de turno, frame inválido, falta de EPP y cierre de jornada con varias personas. Cuando exista aleatoriedad se realizarán al menos cinco repeticiones, con media y desviación estándar. Los logs registrarán percepción, herramienta invocada, decisión, acción y timestamp.
+\vspace{2pt}
+Se probarán escenarios normales, límites y fallas (badge inexistente, empleado duplicado, entrada sin salida, cambio de turno, frame inválido, falta de EPP, cierre de jornada con varias personas). Con aleatoriedad: al menos cinco repeticiones, con media y desviación estándar. Los logs registran percepción, herramienta, decisión, acción y timestamp.
 
-\section{Resultado esperado}
-SAFESITE V2 debe producir un flujo reproducible de control de acceso, asistencia y cumplimiento de EPP, con separación clara entre el razonamiento con herramientas del Agente 1 y la percepción visual del Agente 2. La aprobación de esta propuesta depende de que el alcance, los datos, la línea base y los umbrales sean viables antes de iniciar las pruebas formales.
-
+\vspace{4pt}
+{\footnotesize
 \begin{thebibliography}{9}
-\bibitem{ultralytics_dataset}
-Ultralytics, ``Construction-PPE Dataset,'' documentación oficial, 2026. Disponible en: \url{https://docs.ultralytics.com/datasets/detect/construction-ppe}
-\end{thebibliography}
+\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}
+\bibitem{garces2026} N. F. Garcés Bolaños, D. G. Villota Ortega y A. C. Martínez Rondón, ``Seguridad y salud en el trabajo, mecanismo de desarrollo económico, empresas constructoras, San Juan de Pasto,'' \textit{Rev. Investigium IRE}, vol. 17, no. 1, pp. 13--49, 2026. \url{https://investigiumire.unicesmag.edu.co/index.php/ire/es/article/view/461}
+\bibitem{ultralytics_dataset} Ultralytics, ``Construction-PPE Dataset,'' documentación oficial, 2026. \url{https://docs.ultralytics.com/datasets/detect/construction-ppe}
+\end{thebibliography}}
 
 \end{document}

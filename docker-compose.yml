@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: safesite-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: safesite
+      POSTGRES_PASSWORD: safesite_dev
+      POSTGRES_DB: safesite
+    ports:
+      - "5432:5432"
+    volumes:
+      - safesite_db_data:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U safesite -d safesite"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer:latest
+    container_name: safesite-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  safesite_db_data:
