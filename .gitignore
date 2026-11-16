@@ -31,6 +31,12 @@ deploy/space_build/
 # --- pytest ---
 .pytest_cache/
 
+# --- Entregables que NO se versionan en main (se entregan por separado al profesor) ---
+Documentation/main.tex
+Documentation/main_hito2.tex
+Documentation/GUION_VIDEO.md
+Documentation/ENUNCIADO.md
+
 # --- Scripts de EDA y re-split (derivados, regenerables; no entregan al profesor) ---
 eda/01_inspeccion_ndjson.py
 eda/02_analisis_etiquetas.py
