@@ -30,3 +30,40 @@ deploy/space_build/
 
 # --- pytest ---
 .pytest_cache/
+
+# --- Scripts de EDA y re-split (derivados, regenerables; no entregan al profesor) ---
+eda/01_inspeccion_ndjson.py
+eda/02_analisis_etiquetas.py
+eda/03_analisis_imagenes.py
+eda/04_figuras.py
+eda/05_complementos.py
+eda/06_resplit_oficial.py
+eda/07_oversampling_dataset_v3.py
+
+# --- Scripts de verificación y diagnóstico interno (no entregan al profesor) ---
+scripts/generar_qr_badges.py
+src/safesite/banco_vivo.py
+src/safesite/capturar_banco.py
+src/safesite/prueba_whatsapp.py
+src/safesite/piloto.py
+src/safesite/servidor_webhook.py
+
+# --- Documentación interna / ruido para el profesor ---
+Documentation/BITACORA_USO_IA_NOMINA.md
+Documentation/CRISPML_INTEGRACION_NOMINA.md
+Documentation/DIAGRAMAS_BD_NOMINA.md
+Documentation/DIAGRAMA_SECUENCIA_FALLOS_Y_ALERTAS.md
+Documentation/DIAGRAMA_SECUENCIA_OPERACION_NORMAL.md
+Documentation/DICCIONARIO_DATOS_NOMINA.md
+Documentation/contexto_manus.md
+Documentation/SKILLS.md
+Documentation/WHATSAPP_LIMITES_COSTOS.md
+Documentation/Actualización_Agente_SAFESITE.pdf
+Documentation/Markdown pegado.md
+Documentation/Tabla_de_cambios.docx
+Documentation/generar_tabla_docx.py
+
+# --- Salidas intermedias de EDA y pruebas (no entregan) ---
+eda/salidas/banco_vivo_*.md
+eda/salidas/pruebas_fase3/*.md
+runs/agente/pruebas/*.md
